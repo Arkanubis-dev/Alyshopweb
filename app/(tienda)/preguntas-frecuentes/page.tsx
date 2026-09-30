@@ -42,11 +42,11 @@ const FAQS = [
     questions: [
       {
         q: "¿A qué ciudades de Colombia realizan envíos?",
-        a: "Hacemos envíos a toda Colombia. Desde nuestra sede principal en Cali despachamos a Bogotá, Medellín, Barranquilla, Bucaramanga, Cartagena, Pereira, Manizales, Cúcuta y todos los municipios del territorio nacional cubiertos por transportadoras reconocidas (Interrapidísimo, Servientrega, Envía o Coordinadora).",
+        a: "Hacemos envíos a toda Colombia. Desde nuestra sede principal en Bogotá despachamos a Medellín, Cali, Barranquilla, Bucaramanga, Cartagena, Pereira, Manizales, Cúcuta y todos los municipios del territorio nacional cubiertos por transportadoras reconocidas (Interrapidísimo, Servientrega, Envía o Coordinadora).",
       },
       {
         q: "¿Cuánto tiempo tarda en llegar mi pedido?",
-        a: "Para Cali y el área metropolitana las entregas se realizan entre 24 a 48 horas hábiles. Para el resto de ciudades principales del país, el tiempo promedio es de 2 a 4 días hábiles posteriores a la confirmación del despacho.",
+        a: "Para Bogotá y el área metropolitana las entregas se realizan entre 24 a 48 horas hábiles. Para el resto de ciudades principales del país, el tiempo promedio es de 2 a 4 días hábiles posteriores a la confirmación del despacho.",
       },
       {
         q: "¿Cómo puedo rastrear mi paquete?",

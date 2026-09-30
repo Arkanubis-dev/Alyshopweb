@@ -132,7 +132,7 @@ export function InvoiceView({ order, whatsappUrl }: InvoiceViewProps) {
           <div className="space-y-2">
             <Logo size="md" />
             <p className="text-xs text-[#7A7590]">
-              Tienda en línea • Cali, Colombia
+              Tienda en línea • Bogotá, Colombia
             </p>
             <p className="text-xs text-[#7A7590]">
               WhatsApp: +57 321 305 2913 • contacto@alyshop.co

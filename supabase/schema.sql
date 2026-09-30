@@ -691,7 +691,7 @@ INSERT INTO public.settings (key, value) VALUES
   ('store_info', '{
     "name": "alyshop",
     "slogan": "Todo lo que necesitas, en un solo lugar",
-    "city": "Cali",
+    "city": "Bogotá",
     "country": "Colombia",
     "phone": "+57 321 305 2913",
     "email": "contacto@alyshop.co",

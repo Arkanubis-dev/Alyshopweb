@@ -48,7 +48,7 @@ export function CheckoutView() {
     defaultValues: {
       customer_name: "",
       customer_phone: "",
-      city: "Cali",
+      city: "Bogotá",
       neighborhood: "",
       address: "",
       indications: "",
@@ -253,7 +253,7 @@ export function CheckoutView() {
                   />
                   <div>
                     <p className="text-xs font-bold text-[#2E2A3B]">Recoger personalmente</p>
-                    <p className="text-[11px] text-[#7A7590]">En punto de entrega (Cali)</p>
+                    <p className="text-[11px] text-[#7A7590]">En punto de entrega (Bogotá)</p>
                   </div>
                 </label>
               </div>
@@ -276,7 +276,7 @@ export function CheckoutView() {
                     id="city"
                     type="text"
                     {...register("city")}
-                    placeholder="Ej: Cali, Medellín, Bogotá..."
+                    placeholder="Ej: Bogotá, Medellín, Cali..."
                     className="w-full text-xs sm:text-sm p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] focus:outline-none focus:border-[#F472A8]"
                   />
                   {errors.city && (

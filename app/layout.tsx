@@ -35,11 +35,11 @@ export const metadata: Metadata = {
     "Tienda online con variedad de artículos para el hogar, cocina, ropa, belleza, tecnología, juguetes, papelería y mascotas. Envíos rápidos y seguros a toda Colombia. Pide fácil por WhatsApp sin complicaciones.",
   keywords: [
     "tienda online colombia",
-    "compras por internet cali",
+    "compras por internet bogota",
     "alyshop colombia",
-    "articulos para el hogar cali",
+    "articulos para el hogar bogota",
     "cocina y comedor colombia",
-    "productos de belleza bogota medellin cali",
+    "productos de belleza bogota",
     "juguetes y papeleria kawaii",
     "accesorios de tecnologia",
     "compras seguras whatsapp",
@@ -108,7 +108,7 @@ export default function RootLayout({
     telephone: "+573213052913",
     address: {
       "@type": "PostalAddress",
-      addressLocality: "Cali",
+      addressLocality: "Bogotá",
       addressCountry: "CO",
     },
     currenciesAccepted: "COP",

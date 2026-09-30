@@ -7,7 +7,7 @@ import { StoreSettings } from "@/types";
 const DEFAULT_SETTINGS: StoreSettings = {
   name: "alyshop",
   slogan: "Todo lo que necesitas, en un solo lugar",
-  city: "Cali",
+  city: "Bogotá",
   whatsapp_number: "573213052913",
   instagram_url: "https://instagram.com",
   facebook_url: "https://facebook.com",
