@@ -171,3 +171,38 @@ export async function toggleCategoryStatusAction(
     return { success: false, error: err.message };
   }
 }
+
+export async function reorderCategoriesAction(
+  orderedIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createAdminClient();
+    if (supabase && orderedIds.length > 0) {
+      const updates = orderedIds.map((id, index) =>
+        supabase
+          .from("categories")
+          .update({ sort_order: index + 1 })
+          .eq("id", id)
+      );
+      await Promise.all(updates);
+    }
+
+    // Update in-memory fallback store
+    orderedIds.forEach((id, index) => {
+      const cat = adminCategoriesStore.find((c) => c.id === id);
+      if (cat) {
+        cat.sort_order = index + 1;
+      }
+    });
+    adminCategoriesStore.sort((a, b) => a.sort_order - b.sort_order);
+
+    revalidatePath("/admin/categorias");
+    revalidatePath("/categoria/[slug]", "page");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error reordering categories:", err);
+    return { success: false, error: err.message || "Error al reordenar categorías" };
+  }
+}
+

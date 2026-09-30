@@ -24,12 +24,16 @@ import {
   Heart,
   Loader2,
   ArrowRight,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { Category, Product } from "@/types";
 import {
   saveCategoryAction,
   deleteCategoryAction,
   toggleCategoryStatusAction,
+  reorderCategoriesAction,
 } from "@/app/actions/categories";
 
 import { PerfumeIcon } from "@/components/tienda/PerfumeIcon";
@@ -82,6 +86,86 @@ export function CategoryManagementView({
   const showToast = (text: string, type: "success" | "error" = "success") => {
     setNotification({ type, text });
     setTimeout(() => setNotification(null), 3500);
+  };
+
+  // Drag and Drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+
+  const handleReorder = async (newList: Category[]) => {
+    const updated = newList.map((cat, idx) => ({
+      ...cat,
+      sort_order: idx + 1,
+    }));
+    setCategories(updated);
+    setIsReordering(true);
+    try {
+      const res = await reorderCategoriesAction(updated.map((c) => c.id));
+      if (res.success) {
+        showToast("Orden de categorías actualizado");
+      } else {
+        showToast(res.error || "Error al actualizar orden", "error");
+      }
+    } catch (err: any) {
+      showToast("Error al reordenar: " + err.message, "error");
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const updated = [...categories];
+    const [moved] = updated.splice(draggedIndex, 1);
+    updated.splice(targetIndex, 0, moved);
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    handleReorder(updated);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index <= 0) return;
+    const updated = [...categories];
+    const temp = updated[index];
+    updated[index] = updated[index - 1];
+    updated[index - 1] = temp;
+    handleReorder(updated);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index >= categories.length - 1) return;
+    const updated = [...categories];
+    const temp = updated[index];
+    updated[index] = updated[index + 1];
+    updated[index + 1] = temp;
+    handleReorder(updated);
   };
 
   const getProductsCountForCategory = (catId: string) => {
@@ -241,29 +325,102 @@ export function CategoryManagementView({
         </button>
       </div>
 
+      {/* Tip Banner for Drag and Drop */}
+      <div className="flex items-center justify-between gap-3 text-xs text-[#7A7590] bg-[#FAF5FB] border border-[#F0E8F2] px-4 py-2.5 rounded-2xl">
+        <div className="flex items-center gap-2">
+          <GripVertical className="w-4 h-4 text-[#6D4BB8] shrink-0" />
+          <span>
+            <strong>Orden interactivo:</strong> Arrastra las filas o usa las flechas (▲ / ▼) para definir la posición exacta en la tienda. Los números se ajustan solos sin duplicados.
+          </span>
+        </div>
+        {isReordering && (
+          <span className="flex items-center gap-1.5 text-[#6D4BB8] font-bold text-[11px] shrink-0">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Guardando orden...
+          </span>
+        )}
+      </div>
+
       {/* Categories Table */}
       <div className="bg-white rounded-3xl border border-[#F0E8F2] shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
             <thead>
               <tr className="bg-[#FAF5FB] border-b border-[#F0E8F2] text-[11px] font-bold uppercase tracking-wider text-[#7A7590]">
+                <th className="py-3 px-4 text-center w-24">Orden</th>
                 <th className="py-3 px-4">Ícono / Color</th>
                 <th className="py-3 px-4">Nombre</th>
                 <th className="py-3 px-4">Slug</th>
                 <th className="py-3 px-4 text-center">Productos</th>
-                <th className="py-3 px-4 text-center">Orden</th>
                 <th className="py-3 px-4 text-center">Activo</th>
                 <th className="py-3 px-4 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F7F2F9]">
-              {categories.map((cat) => {
+              {categories.map((cat, index) => {
                 const iconObj = AVAILABLE_ICONS.find((i) => i.name === cat.icon) || AVAILABLE_ICONS[0];
                 const IconComponent = iconObj.component;
                 const count = getProductsCountForCategory(cat.id);
+                const isDragging = draggedIndex === index;
+                const isDropTarget = dragOverIndex === index;
 
                 return (
-                  <tr key={cat.id} className="hover:bg-[#FFFBF7]/60 transition-colors">
+                  <tr
+                    key={cat.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onDragEnd={handleDragEnd}
+                    className={`transition-all select-none ${
+                      isDragging
+                        ? "opacity-30 bg-[#FAF5FB]"
+                        : isDropTarget
+                        ? "border-t-2 border-[#6D4BB8] bg-[#EEEAFB]/40"
+                        : "hover:bg-[#FFFBF7]/80"
+                    }`}
+                  >
+                    {/* Interactive Order & Drag Handle */}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div
+                          className="cursor-grab active:cursor-grabbing p-1 text-[#7A7590] hover:text-[#6D4BB8] hover:bg-[#EEEAFB] rounded-md transition-colors"
+                          title="Arrastra para cambiar orden"
+                        >
+                          <GripVertical className="w-4 h-4" />
+                        </div>
+                        <span className="font-bold text-[#6D4BB8] min-w-6 text-center text-xs bg-[#EEEAFB] px-2 py-0.5 rounded-full">
+                          #{index + 1}
+                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveUp(index);
+                            }}
+                            disabled={index === 0}
+                            className="p-0.5 text-[#7A7590] hover:text-[#6D4BB8] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                            title="Subir posición"
+                          >
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveDown(index);
+                            }}
+                            disabled={index === categories.length - 1}
+                            className="p-0.5 text-[#7A7590] hover:text-[#6D4BB8] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                            title="Bajar posición"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+
                     {/* Icon & Color Badge */}
                     <td className="py-3 px-4">
                       <div
@@ -291,11 +448,6 @@ export function CategoryManagementView({
                       </span>
                     </td>
 
-                    {/* Sort Order */}
-                    <td className="py-3 px-4 text-center font-bold text-[#6D4BB8]">
-                      #{cat.sort_order}
-                    </td>
-
                     {/* Active toggle */}
                     <td className="py-3 px-4 text-center">
                       <button
@@ -319,7 +471,7 @@ export function CategoryManagementView({
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(cat)}
-                          className="p-1.5 text-[#7A7590] hover:text-[#6D4BB8] hover:bg-[#EEEAFB] rounded-lg transition-colors"
+                          className="p-1.5 text-[#7A7590] hover:text-[#6D4BB8] hover:bg-[#EEEAFB] rounded-lg transition-colors cursor-pointer"
                           title="Editar categoría"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -327,7 +479,7 @@ export function CategoryManagementView({
                         <button
                           type="button"
                           onClick={() => handleDeleteClick(cat)}
-                          className="p-1.5 text-[#7A7590] hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          className="p-1.5 text-[#7A7590] hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                           title="Eliminar categoría"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -451,21 +603,16 @@ export function CategoryManagementView({
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[#2E2A3B]">
-                    Orden de aparición (número)
-                  </label>
-                  <input
-                    type="number"
-                    value={editingCategory.sort_order ?? 0}
-                    onChange={(e) =>
-                      setEditingCategory({
-                        ...editingCategory,
-                        sort_order: Number(e.target.value),
-                      })
-                    }
-                    className="w-full text-xs p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2]"
-                  />
+                <div className="p-3.5 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] space-y-1">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[#2E2A3B]">
+                    <span>Orden en la tienda</span>
+                    <span className="font-bold text-[#6D4BB8] bg-[#EEEAFB] px-2.5 py-0.5 rounded-full">
+                      Posición #{editingCategory.sort_order ?? categories.length + 1}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#7A7590]">
+                    El orden se organiza automáticamente arrastrando las categorías en la tabla o con las flechas, evitando números duplicados.
+                  </p>
                 </div>
 
                 <label className="flex items-center gap-2 text-xs font-bold text-[#2E2A3B] cursor-pointer pt-2">

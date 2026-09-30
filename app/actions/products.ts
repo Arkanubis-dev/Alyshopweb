@@ -28,7 +28,7 @@ export async function getAllAdminProducts(): Promise<Product[]> {
         .order("created_at", { ascending: false });
 
       if (!error && data && data.length > 0) {
-        return data.map((item: any) => ({
+        const mapped = data.map((item: any) => ({
           id: item.id,
           category_id: item.category_id,
           category_name: item.categories?.name || "",
@@ -55,6 +55,26 @@ export async function getAllAdminProducts(): Promise<Product[]> {
           })),
           created_at: item.created_at,
         }));
+
+        // Fetch display order from settings
+        const { data: orderData } = await supabase
+          .from("settings")
+          .select("value")
+          .eq("key", "products_display_order")
+          .single();
+
+        const orderList: string[] = orderData?.value?.order || [];
+        if (orderList.length > 0) {
+          const orderMap = new Map(orderList.map((id, idx) => [id, idx]));
+          return mapped.sort((a, b) => {
+            const posA = orderMap.has(a.id) ? orderMap.get(a.id)! : 999999;
+            const posB = orderMap.has(b.id) ? orderMap.get(b.id)! : 999999;
+            if (posA !== posB) return posA - posB;
+            return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+          });
+        }
+
+        return mapped;
       }
     }
     return adminProductsStore;
@@ -283,3 +303,36 @@ export async function uploadProductImageAction(
     return { success: false, error: err.message || "Error al subir imagen" };
   }
 }
+
+export async function reorderProductsAction(
+  orderedIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createAdminClient();
+    if (supabase && orderedIds.length > 0) {
+      const { error } = await supabase.from("settings").upsert({
+        key: "products_display_order",
+        value: { order: orderedIds },
+      });
+      if (error) throw error;
+    }
+
+    // Update in-memory fallback store
+    const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
+    adminProductsStore.sort((a, b) => {
+      const posA = orderMap.has(a.id) ? orderMap.get(a.id)! : 999999;
+      const posB = orderMap.has(b.id) ? orderMap.get(b.id)! : 999999;
+      if (posA !== posB) return posA - posB;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+
+    revalidatePath("/admin/productos");
+    revalidatePath("/categoria/[slug]", "page");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error reordering products:", err);
+    return { success: false, error: err.message || "Error al reordenar productos" };
+  }
+}
+

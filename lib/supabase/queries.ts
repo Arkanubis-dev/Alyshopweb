@@ -77,6 +77,36 @@ export async function getCategories(): Promise<Category[]> {
 }
 
 /**
+ * Helper to fetch product display order array from settings
+ */
+async function getProductsDisplayOrder(supabase: any): Promise<string[]> {
+  try {
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "products_display_order")
+      .single();
+    return data?.value?.order || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Helper to sort products according to saved display order
+ */
+function sortProductsByDisplayOrder(products: Product[], orderList: string[]): Product[] {
+  if (!orderList || orderList.length === 0) return products;
+  const orderMap = new Map(orderList.map((id, index) => [id, index]));
+  return [...products].sort((a, b) => {
+    const posA = orderMap.has(a.id) ? orderMap.get(a.id)! : 999999;
+    const posB = orderMap.has(b.id) ? orderMap.get(b.id)! : 999999;
+    if (posA !== posB) return posA - posB;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
+}
+
+/**
  * Fetch featured products from Supabase with their primary images and category name.
  */
 export async function getFeaturedProducts(): Promise<Product[]> {
@@ -106,7 +136,9 @@ export async function getFeaturedProducts(): Promise<Product[]> {
       return MOCK_PRODUCTS;
     }
 
-    return data.map(mapDbProduct);
+    const orderList = await getProductsDisplayOrder(supabase);
+    const mapped = data.map(mapDbProduct);
+    return sortProductsByDisplayOrder(mapped, orderList);
   } catch (err) {
     console.error("Error fetching products from Supabase:", err);
     return MOCK_PRODUCTS;
@@ -213,9 +245,11 @@ export async function getProductsByCategory(
       return { category, products: filtered };
     }
 
+    const orderList = await getProductsDisplayOrder(supabase);
+    const mapped = data.map(mapDbProduct);
     return {
       category,
-      products: data.map(mapDbProduct),
+      products: sortProductsByDisplayOrder(mapped, orderList),
     };
   } catch (err) {
     console.error(`Error fetching products for category ${categorySlug}:`, err);
