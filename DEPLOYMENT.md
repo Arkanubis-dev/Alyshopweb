@@ -65,6 +65,11 @@ NEXT_PUBLIC_SITE_URL=https://alyshop.co
 
 # Teléfono receptor de WhatsApp (código de país 57 + 10 dígitos)
 NEXT_PUBLIC_WHATSAPP_NUMBER=573213052913
+
+# Redes Sociales (Opcionales)
+NEXT_PUBLIC_INSTAGRAM_URL=https://instagram.com/tu_cuenta
+NEXT_PUBLIC_FACEBOOK_URL=https://facebook.com/tu_pagina
+NEXT_PUBLIC_TIKTOK_URL=https://tiktok.com/@tu_cuenta
 ```
 
 > **Nota:** La aplicación cuenta con un modo de respaldo en memoria (*fallback store*). Si estas variables no están configuradas durante el desarrollo, la plataforma continuará funcionando en modo demostración con datos simulados y autenticación demo (`admin@alyshop.co` / `admin123`).

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageCircle, Heart, MapPin, Mail, Phone } from "lucide-react";
+import { MessageCircle, Heart, MapPin, Phone } from "lucide-react";
 import { Logo } from "./Logo";
 
 export function Footer() {
@@ -104,40 +104,56 @@ export function Footer() {
                 <Phone className="w-4 h-4 text-[#F472A8] shrink-0" />
                 <span>+57 321 305 2913</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-[#F472A8] shrink-0" />
-                <span>contacto@alyshop.co</span>
-              </div>
             </div>
 
-            <div className="pt-2 flex items-center gap-3">
-              {/* Instagram SVG */}
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="w-8 h-8 rounded-full bg-[#FCE4EF] text-[#6D4BB8] hover:bg-[#F472A8] hover:text-white flex items-center justify-center transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                  <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
-                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-                  <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
-                </svg>
-              </a>
-              {/* Facebook SVG */}
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                className="w-8 h-8 rounded-full bg-[#FCE4EF] text-[#6D4BB8] hover:bg-[#F472A8] hover:text-white flex items-center justify-center transition-colors"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 8H6v4h3v12h5V12h3.642L18 8h-4V6.333C14 5.374 14.5 5 15.667 5H18V0h-3.889C10.5 0 9 1.583 9 4.615V8z"/>
-                </svg>
-              </a>
-            </div>
+            {/* Redes sociales dinámicas desde variables de entorno */}
+            {(process.env.NEXT_PUBLIC_INSTAGRAM_URL ||
+              process.env.NEXT_PUBLIC_FACEBOOK_URL ||
+              process.env.NEXT_PUBLIC_TIKTOK_URL) && (
+              <div className="pt-2 flex items-center gap-3">
+                {process.env.NEXT_PUBLIC_INSTAGRAM_URL && (
+                  <a
+                    href={process.env.NEXT_PUBLIC_INSTAGRAM_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Instagram"
+                    className="w-8 h-8 rounded-full bg-[#FCE4EF] text-[#6D4BB8] hover:bg-[#F472A8] hover:text-white flex items-center justify-center transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
+                      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+                    </svg>
+                  </a>
+                )}
+                {process.env.NEXT_PUBLIC_FACEBOOK_URL && (
+                  <a
+                    href={process.env.NEXT_PUBLIC_FACEBOOK_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Facebook"
+                    className="w-8 h-8 rounded-full bg-[#FCE4EF] text-[#6D4BB8] hover:bg-[#F472A8] hover:text-white flex items-center justify-center transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 8H6v4h3v12h5V12h3.642L18 8h-4V6.333C14 5.374 14.5 5 15.667 5H18V0h-3.889C10.5 0 9 1.583 9 4.615V8z"/>
+                    </svg>
+                  </a>
+                )}
+                {process.env.NEXT_PUBLIC_TIKTOK_URL && (
+                  <a
+                    href={process.env.NEXT_PUBLIC_TIKTOK_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="TikTok"
+                    className="w-8 h-8 rounded-full bg-[#FCE4EF] text-[#6D4BB8] hover:bg-[#F472A8] hover:text-white flex items-center justify-center transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.29 0 .57.04.84.11V9.4a6.33 6.33 0 0 0-6.6 6.32 6.34 6.34 0 0 0 10.84 4.51c1.2-1.2 1.81-2.82 1.81-4.51V8.65a8.28 8.28 0 0 0 4.22 1.5V6.7c-.33 0-.67-.01-1-.01z"/>
+                    </svg>
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

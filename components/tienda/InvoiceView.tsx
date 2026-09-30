@@ -135,7 +135,7 @@ export function InvoiceView({ order, whatsappUrl }: InvoiceViewProps) {
               Tienda en línea • Bogotá, Colombia
             </p>
             <p className="text-xs text-[#7A7590]">
-              WhatsApp: +57 321 305 2913 • contacto@alyshop.co
+              WhatsApp de atención: +57 321 305 2913
             </p>
           </div>
 
