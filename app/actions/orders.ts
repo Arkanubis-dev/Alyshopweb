@@ -1,0 +1,190 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { Order, OrderStatus } from "@/types";
+import { fallbackOrders } from "@/lib/orders-cache";
+import { updateProductStockAction } from "./inventory";
+import { getAllAdminProducts } from "./products";
+
+export async function getAllAdminOrdersAction(): Promise<Order[]> {
+  try {
+    const supabase = createAdminClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          *,
+          order_items (*)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data.map((d: any) => ({
+          id: d.id,
+          code: d.code,
+          public_token: d.public_token,
+          customer_name: d.customer_name,
+          customer_phone: d.customer_phone,
+          city: d.city,
+          neighborhood: d.neighborhood,
+          address: d.address,
+          notes: d.notes,
+          delivery_method: d.delivery_method,
+          subtotal: Number(d.subtotal),
+          shipping_cost: Number(d.shipping_cost),
+          total: Number(d.total),
+          status: d.status,
+          internal_notes: d.internal_notes,
+          created_at: d.created_at,
+          order_items: (d.order_items || []).map((i: any) => ({
+            id: i.id,
+            order_id: i.order_id,
+            product_id: i.product_id,
+            product_name: i.product_name,
+            unit_price: Number(i.unit_price),
+            quantity: i.quantity,
+            subtotal: Number(i.subtotal),
+            image_url: i.image_url,
+          })),
+        }));
+      }
+    }
+
+    return Array.from(fallbackOrders.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  } catch (err) {
+    console.error("Error in getAllAdminOrdersAction:", err);
+    return Array.from(fallbackOrders.values());
+  }
+}
+
+export async function updateOrderStatusAction(
+  orderId: string,
+  newStatus: OrderStatus
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const orders = await getAllAdminOrdersAction();
+    const order = orders.find((o) => o.id === orderId || o.code === orderId);
+    if (!order) return { success: false, error: "Pedido no encontrado" };
+
+    const oldStatus = order.status;
+    if (oldStatus === newStatus) return { success: true };
+
+    const allProducts = await getAllAdminProducts();
+
+    // =========================================================================
+    // REGLA DE INVENTARIO:
+    // Al pasar a 'confirmado': descontar stock de cada producto.
+    // =========================================================================
+    if (newStatus === "confirmado" && oldStatus === "pendiente") {
+      // 1. Validar existencias
+      for (const item of order.order_items || []) {
+        if (item.product_id) {
+          const prod = allProducts.find((p) => p.id === item.product_id);
+          if (prod && prod.stock < item.quantity) {
+            return {
+              success: false,
+              error: `No hay stock suficiente para confirmar: "${prod.name}" tiene ${prod.stock} disponibles y el pedido requiere ${item.quantity}.`,
+            };
+          }
+        }
+      }
+
+      // 2. Descontar stock
+      for (const item of order.order_items || []) {
+        if (item.product_id) {
+          const prod = allProducts.find((p) => p.id === item.product_id);
+          if (prod) {
+            const nextStock = Math.max(0, prod.stock - item.quantity);
+            await updateProductStockAction(
+              prod.id,
+              nextStock,
+              `Salida por venta pedido ${order.code}`,
+              "salida"
+            );
+          }
+        }
+      }
+    }
+
+    // =========================================================================
+    // REGLA DE INVENTARIO:
+    // Si se cancela un pedido previamente confirmado o enviado: devolver stock.
+    // =========================================================================
+    if (newStatus === "cancelado" && (oldStatus === "confirmado" || oldStatus === "enviado")) {
+      for (const item of order.order_items || []) {
+        if (item.product_id) {
+          const prod = allProducts.find((p) => p.id === item.product_id);
+          if (prod) {
+            const nextStock = prod.stock + item.quantity;
+            await updateProductStockAction(
+              prod.id,
+              nextStock,
+              `Devolución por cancelación pedido ${order.code}`,
+              "devolucion"
+            );
+          }
+        }
+      }
+    }
+
+    // Actualizar estado en Supabase
+    const supabase = createAdminClient();
+    if (supabase) {
+      await supabase
+        .from("orders")
+        .update({ status: newStatus })
+        .eq("id", order.id);
+    }
+
+    // Actualizar estado local
+    order.status = newStatus;
+    fallbackOrders.set(order.code, order);
+
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin/inventario");
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error updating order status:", err);
+    return { success: false, error: err.message || "Error al actualizar estado" };
+  }
+}
+
+export async function updateOrderDetailsAction(
+  orderId: string,
+  shippingCost: number,
+  internalNotes?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const orders = await getAllAdminOrdersAction();
+    const order = orders.find((o) => o.id === orderId || o.code === orderId);
+    if (!order) return { success: false, error: "Pedido no encontrado" };
+
+    const total = order.subtotal + shippingCost;
+
+    const supabase = createAdminClient();
+    if (supabase) {
+      await supabase
+        .from("orders")
+        .update({
+          shipping_cost: shippingCost,
+          total: total,
+          internal_notes: internalNotes || null,
+        })
+        .eq("id", order.id);
+    }
+
+    order.shipping_cost = shippingCost;
+    order.total = total;
+    order.internal_notes = internalNotes;
+    fallbackOrders.set(order.code, order);
+
+    revalidatePath("/admin/pedidos");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
