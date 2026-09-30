@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Category } from "@/types";
 
+import { PerfumeIcon } from "./PerfumeIcon";
+
 interface CategorySidebarProps {
   categories: Category[];
   activeSlug?: string;
@@ -31,6 +33,8 @@ const ICON_MAP: Record<string, any> = {
   Dumbbell,
   PawPrint,
   Grid,
+  Perfume: PerfumeIcon,
+  Fragrance: PerfumeIcon,
 };
 
 export function CategorySidebar({ categories, activeSlug }: CategorySidebarProps) {

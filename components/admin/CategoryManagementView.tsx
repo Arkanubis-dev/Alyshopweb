@@ -32,7 +32,10 @@ import {
   toggleCategoryStatusAction,
 } from "@/app/actions/categories";
 
+import { PerfumeIcon } from "@/components/tienda/PerfumeIcon";
+
 const AVAILABLE_ICONS = [
+  { name: "Perfume", component: PerfumeIcon, label: "Perfumes" },
   { name: "Home", component: Home, label: "Hogar" },
   { name: "UtensilsCrossed", component: UtensilsCrossed, label: "Cocina" },
   { name: "Shirt", component: Shirt, label: "Ropa" },

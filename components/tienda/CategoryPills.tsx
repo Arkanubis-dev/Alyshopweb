@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { MOCK_CIRCULAR_CATEGORIES } from "@/lib/mock-data";
 
+import { PerfumeIcon } from "./PerfumeIcon";
+
 interface CategoryPillsProps {
   activeSlug?: string;
 }
@@ -26,6 +28,8 @@ const ICON_MAP: Record<string, any> = {
   Gamepad2,
   BookOpen,
   PawPrint,
+  Perfume: PerfumeIcon,
+  Fragrance: PerfumeIcon,
 };
 
 export function CategoryPills({ activeSlug }: CategoryPillsProps) {

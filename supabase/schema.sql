@@ -479,7 +479,8 @@ INSERT INTO public.categories (id, name, slug, icon, color, sort_order, is_activ
   ('c0000000-0000-0000-0000-000000000007', 'Papelería y oficina', 'papeleria-y-oficina', 'BookOpen', '#FCE4EF', 7, true),
   ('c0000000-0000-0000-0000-000000000008', 'Deportes y aire libre', 'deportes-y-aire-libre', 'Dumbbell', '#EEEAFB', 8, true),
   ('c0000000-0000-0000-0000-000000000009', 'Mascotas', 'mascotas', 'PawPrint', '#DDF3EC', 9, true),
-  ('c0000000-0000-0000-0000-000000000010', 'Más variedades', 'mas-variedades', 'Grid', '#FFF1CC', 10, true)
+  ('c0000000-0000-0000-0000-000000000010', 'Más variedades', 'mas-variedades', 'Grid', '#FFF1CC', 10, true),
+  ('c0000000-0000-0000-0000-000000000011', 'Perfumería y Fragancias', 'perfumes', 'Perfume', '#FDE8DD', 11, true)
 ON CONFLICT (slug) DO NOTHING;
 
 -- 8.2 Productos

@@ -22,6 +22,8 @@ import {
 import { MOCK_CATEGORIES } from "@/lib/mock-data";
 import { Logo } from "./Logo";
 
+import { PerfumeIcon } from "./PerfumeIcon";
+
 interface MobileCategoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,6 +40,8 @@ const ICON_MAP: Record<string, any> = {
   Dumbbell,
   PawPrint,
   Grid,
+  Perfume: PerfumeIcon,
+  Fragrance: PerfumeIcon,
 };
 
 export function MobileCategoryDrawer({ isOpen, onClose }: MobileCategoryDrawerProps) {

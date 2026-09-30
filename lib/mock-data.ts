@@ -101,13 +101,24 @@ export const MOCK_CATEGORIES: Category[] = [
     is_active: true,
     item_count: 47,
   },
+  {
+    id: "cat-11",
+    name: "Perfumería y Fragancias",
+    slug: "perfumes",
+    icon: "Perfume",
+    color: "#FDE8DD",
+    sort_order: 11,
+    is_active: true,
+    item_count: 24,
+  },
 ];
 
 export const MOCK_CIRCULAR_CATEGORIES = [
   { name: "Hogar", slug: "hogar-y-decoracion", icon: "Home", bg: "bg-[#FCE4EF]", color: "text-[#6D4BB8]" },
   { name: "Cocina", slug: "cocina-y-comedor", icon: "UtensilsCrossed", bg: "bg-[#EEEAFB]", color: "text-[#6D4BB8]" },
-  { name: "Ropa", slug: "ropa-y-accesorios", icon: "Shirt", bg: "bg-[#DDF3EC]", color: "text-[#28795A]" },
+  { name: "Perfumes", slug: "perfumes", icon: "Perfume", bg: "bg-[#FDE8DD]", color: "text-[#D25832]" },
   { name: "Belleza", slug: "belleza-y-cuidado-personal", icon: "Sparkles", bg: "bg-[#FDE8DD]", color: "text-[#D25832]" },
+  { name: "Ropa", slug: "ropa-y-accesorios", icon: "Shirt", bg: "bg-[#DDF3EC]", color: "text-[#28795A]" },
   { name: "Tecnología", slug: "tecnologia-y-accesorios", icon: "Headphones", bg: "bg-[#E0EEFB]", color: "text-[#2D73B6]" },
   { name: "Juguetes", slug: "juguetes-y-juegos", icon: "Gamepad2", bg: "bg-[#FFF1CC]", color: "text-[#B37E12]" },
   { name: "Papelería", slug: "papeleria-y-oficina", icon: "BookOpen", bg: "bg-[#FCE4EF]", color: "text-[#D94883]" },
