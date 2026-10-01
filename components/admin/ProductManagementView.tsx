@@ -49,6 +49,7 @@ export function ProductManagementView({
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todas");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("todas");
   const [stockFilter, setStockFilter] = useState("todos");
 
   // Drawer / Form state
@@ -164,6 +165,10 @@ export function ProductManagementView({
       if (selectedCategory !== "todas" && p.category_id !== selectedCategory) {
         return false;
       }
+      // Subcategory filter
+      if (selectedSubcategory !== "todas" && p.subcategory !== selectedSubcategory) {
+        return false;
+      }
       // Stock filter
       if (stockFilter === "disponibles" && p.stock <= 0) return false;
       if (stockFilter === "bajas" && (p.stock <= 0 || p.stock > p.low_stock_threshold)) return false;
@@ -191,6 +196,7 @@ export function ProductManagementView({
       description: "",
       detail: "",
       category_id: categories[0]?.id || "",
+      subcategory: "",
       brand: "",
       sku: `ALY-${Math.floor(100 + Math.random() * 900)}`,
       price: 25000,
@@ -206,7 +212,10 @@ export function ProductManagementView({
   };
 
   const handleOpenEdit = (product: Product) => {
-    setEditingProduct({ ...product });
+    setEditingProduct({
+      ...product,
+      subcategory: product.subcategory || "",
+    });
     setIsDrawerOpen(true);
   };
 
@@ -486,7 +495,10 @@ export function ProductManagementView({
           {/* Category Filter */}
           <select
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            onChange={(e) => {
+              setSelectedCategory(e.target.value);
+              setSelectedSubcategory("todas");
+            }}
             className="text-xs font-semibold text-[#2E2A3B] bg-[#FAF5FB] border border-[#F0E8F2] rounded-xl px-3 py-2 focus:outline-none focus:border-[#F472A8] cursor-pointer"
           >
             <option value="todas">Todas las categorías</option>
@@ -496,6 +508,28 @@ export function ProductManagementView({
               </option>
             ))}
           </select>
+
+          {/* Subcategory Filter (when category is selected and has subcategories) */}
+          {(() => {
+            const catObj = categories.find((c) => c.id === selectedCategory);
+            if (catObj && catObj.subcategories && catObj.subcategories.length > 0) {
+              return (
+                <select
+                  value={selectedSubcategory}
+                  onChange={(e) => setSelectedSubcategory(e.target.value)}
+                  className="text-xs font-semibold text-[#6D4BB8] bg-[#EEEAFB] border border-[#E0D4F0] rounded-xl px-3 py-2 focus:outline-none focus:border-[#6D4BB8] cursor-pointer"
+                >
+                  <option value="todas">Todas las subcategorías</option>
+                  {catObj.subcategories.map((sub) => (
+                    <option key={sub} value={sub}>
+                      {sub}
+                    </option>
+                  ))}
+                </select>
+              );
+            }
+            return null;
+          })()}
 
           {/* Stock Filter */}
           <select
@@ -640,11 +674,18 @@ export function ProductManagementView({
                       </div>
                     </td>
 
-                    {/* Categoría */}
+                    {/* Categoría y Subcategoría */}
                     <td className="py-3 px-4 text-xs text-[#7A7590]">
-                      <span className="px-2.5 py-1 rounded-lg bg-[#EEEAFB] text-[#6D4BB8] font-semibold text-[11px]">
-                        {p.category_name || "Sin categoría"}
-                      </span>
+                      <div className="space-y-1">
+                        <span className="px-2.5 py-1 rounded-lg bg-[#EEEAFB] text-[#6D4BB8] font-semibold text-[11px] inline-block">
+                          {p.category_name || "Sin categoría"}
+                        </span>
+                        {p.subcategory && (
+                          <span className="block text-[10px] font-bold text-[#F472A8] bg-[#FCE4EF] px-2 py-0.5 rounded-md w-fit">
+                            {p.subcategory}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Precio */}
@@ -824,7 +865,11 @@ export function ProductManagementView({
                     <select
                       value={editingProduct.category_id || ""}
                       onChange={(e) =>
-                        setEditingProduct({ ...editingProduct, category_id: e.target.value })
+                        setEditingProduct({
+                          ...editingProduct,
+                          category_id: e.target.value,
+                          subcategory: "",
+                        })
                       }
                       className="w-full text-xs p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] focus:outline-none focus:border-[#F472A8]"
                     >
@@ -836,6 +881,36 @@ export function ProductManagementView({
                     </select>
                   </div>
                 </div>
+
+                {/* Subcategoría selector (si la categoría seleccionada tiene subcategorías) */}
+                {(() => {
+                  const currentCat = categories.find((c) => c.id === editingProduct.category_id);
+                  if (currentCat && currentCat.subcategories && currentCat.subcategories.length > 0) {
+                    return (
+                      <div className="space-y-1 p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2]">
+                        <label className="text-xs font-semibold text-[#2E2A3B] flex items-center justify-between">
+                          <span>Subcategoría (Opcional)</span>
+                          <span className="text-[10px] text-[#6D4BB8] font-bold">No obligatorio</span>
+                        </label>
+                        <select
+                          value={editingProduct.subcategory || ""}
+                          onChange={(e) =>
+                            setEditingProduct({ ...editingProduct, subcategory: e.target.value })
+                          }
+                          className="w-full text-xs p-2.5 rounded-lg bg-white border border-[#E0D4F0] focus:outline-none focus:border-[#6D4BB8]"
+                        >
+                          <option value="">Sin subcategoría (General)</option>
+                          {currentCat.subcategories.map((sub) => (
+                            <option key={sub} value={sub}>
+                              {sub}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">

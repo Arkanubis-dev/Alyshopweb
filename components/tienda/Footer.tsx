@@ -1,8 +1,36 @@
 import Link from "next/link";
 import { MessageCircle, Heart, MapPin, Phone } from "lucide-react";
 import { Logo } from "./Logo";
+import { getStoreSettings } from "@/lib/supabase/queries";
 
-export function Footer() {
+export async function Footer() {
+  const settings = await getStoreSettings();
+
+  const rawWhatsapp =
+    settings.whatsapp?.number ||
+    process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ||
+    "573213052913";
+  const cleanPhone = rawWhatsapp.replace(/\D/g, "");
+
+  const cityName = settings.store_info?.city || "Bogotá";
+
+  const instagramUrl =
+    settings.social?.instagram ||
+    process.env.NEXT_PUBLIC_INSTAGRAM_URL ||
+    "";
+
+  const facebookUrl =
+    settings.social?.facebook ||
+    process.env.NEXT_PUBLIC_FACEBOOK_URL ||
+    "";
+
+  const tiktokUrl =
+    settings.social?.tiktok ||
+    process.env.NEXT_PUBLIC_TIKTOK_URL ||
+    "";
+
+  const hasSocials = Boolean(instagramUrl || facebookUrl || tiktokUrl);
+
   return (
     <footer className="w-full bg-white border-t border-[#F0E8F2] pt-12 pb-24 md:pb-12 text-[#2E2A3B]">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -16,7 +44,7 @@ export function Footer() {
             </p>
             {/* WhatsApp direct CTA */}
             <a
-              href="https://wa.me/573213052913?text=Hola%20alyshop,%20tengo%20una%20consulta%20sobre%20sus%20productos"
+              href={`https://wa.me/${cleanPhone}?text=Hola%20alyshop,%20tengo%20una%20consulta%20sobre%20sus%20productos`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-bold transition-all shadow-xs"
@@ -45,6 +73,11 @@ export function Footer() {
               <li>
                 <Link href="/categoria/belleza-y-cuidado-personal" className="hover:text-[#6D4BB8] transition-colors">
                   Belleza y cuidado personal
+                </Link>
+              </li>
+              <li>
+                <Link href="/categoria/perfumes" className="hover:text-[#6D4BB8] transition-colors">
+                  Perfumería y fragancias
                 </Link>
               </li>
               <li>
@@ -98,7 +131,7 @@ export function Footer() {
             <div className="space-y-2 text-xs sm:text-sm text-[#7A7590]">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[#F472A8] shrink-0" />
-                <span>Bogotá, Colombia • Envíos nacionales</span>
+                <span>{cityName}, Colombia • Envíos nacionales</span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-[#F472A8] shrink-0" />
@@ -106,14 +139,12 @@ export function Footer() {
               </div>
             </div>
 
-            {/* Redes sociales dinámicas desde variables de entorno */}
-            {(process.env.NEXT_PUBLIC_INSTAGRAM_URL ||
-              process.env.NEXT_PUBLIC_FACEBOOK_URL ||
-              process.env.NEXT_PUBLIC_TIKTOK_URL) && (
+            {/* Redes sociales dinámicas configurables desde el panel admin */}
+            {hasSocials && (
               <div className="pt-2 flex items-center gap-3">
-                {process.env.NEXT_PUBLIC_INSTAGRAM_URL && (
+                {instagramUrl && (
                   <a
-                    href={process.env.NEXT_PUBLIC_INSTAGRAM_URL}
+                    href={instagramUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Instagram"
@@ -126,9 +157,9 @@ export function Footer() {
                     </svg>
                   </a>
                 )}
-                {process.env.NEXT_PUBLIC_FACEBOOK_URL && (
+                {facebookUrl && (
                   <a
-                    href={process.env.NEXT_PUBLIC_FACEBOOK_URL}
+                    href={facebookUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Facebook"
@@ -139,9 +170,9 @@ export function Footer() {
                     </svg>
                   </a>
                 )}
-                {process.env.NEXT_PUBLIC_TIKTOK_URL && (
+                {tiktokUrl && (
                   <a
-                    href={process.env.NEXT_PUBLIC_TIKTOK_URL}
+                    href={tiktokUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="TikTok"

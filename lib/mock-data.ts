@@ -10,6 +10,7 @@ export const MOCK_CATEGORIES: Category[] = [
     sort_order: 1,
     is_active: true,
     item_count: 42,
+    subcategories: ["Salas", "Comedor", "Organización", "Decoración"],
   },
   {
     id: "cat-2",
@@ -40,6 +41,7 @@ export const MOCK_CATEGORIES: Category[] = [
     sort_order: 4,
     is_active: true,
     item_count: 51,
+    subcategories: ["Maquillaje", "Cuidado Facial", "Accesorios"],
   },
   {
     id: "cat-5",
@@ -110,6 +112,7 @@ export const MOCK_CATEGORIES: Category[] = [
     sort_order: 11,
     is_active: true,
     item_count: 24,
+    subcategories: ["Hombre", "Mujer", "Unisex", "Splashes y Brumas"],
   },
 ];
 

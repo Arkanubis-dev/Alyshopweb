@@ -20,23 +20,39 @@ import {
   User,
   MapPin,
   Phone,
-  Calendar,
   AlertTriangle,
   Loader2,
+  Trash2,
+  Plus,
+  Minus,
+  Eye,
 } from "lucide-react";
-import { Order, OrderStatus } from "@/types";
+import { Order, OrderStatus, Product } from "@/types";
 import { formatCOP } from "@/lib/utils";
 import {
   updateOrderStatusAction,
   updateOrderDetailsAction,
+  updateFullOrderAction,
+  deleteOrderAction,
 } from "@/app/actions/orders";
 
 interface OrdersViewProps {
   initialOrders: Order[];
+  products?: Product[];
 }
 
-export function OrdersView({ initialOrders }: OrdersViewProps) {
-  const [orders, setProducts] = useState<Order[]>(initialOrders);
+interface EditableItem {
+  id?: string;
+  product_id?: string;
+  product_name: string;
+  unit_price: number;
+  quantity: number;
+  subtotal?: number;
+  image_url?: string;
+}
+
+export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
 
@@ -46,6 +62,26 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
   const [editingShippingCost, setEditingShippingCost] = useState<number>(0);
   const [editingInternalNotes, setEditingInternalNotes] = useState<string>("");
   const [isSavingDetails, setIsSavingDetails] = useState(false);
+
+  // Full Order Edit Modal State (CRUD)
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editCustomerPhone, setEditCustomerPhone] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [editNeighborhood, setEditNeighborhood] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editDeliveryMethod, setEditDeliveryMethod] = useState<"envio" | "recoger">("envio");
+  const [editNotes, setEditNotes] = useState("");
+  const [editInternalNotes, setEditInternalNotes] = useState("");
+  const [editStatus, setEditStatus] = useState<OrderStatus>("pendiente");
+  const [editShippingCost, setEditShippingCost] = useState<number>(0);
+  const [editItems, setEditItems] = useState<EditableItem[]>([]);
+  const [selectedProdToAdd, setSelectedProdToAdd] = useState<string>("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Delete Order Confirmation Modal State (CRUD)
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
 
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -89,6 +125,155 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
     setEditingInternalNotes(order.internal_notes || "");
   };
 
+  const handleOpenEdit = (order: Order) => {
+    setEditingOrder(order);
+    setEditCustomerName(order.customer_name);
+    setEditCustomerPhone(order.customer_phone);
+    setEditCity(order.city);
+    setEditNeighborhood(order.neighborhood);
+    setEditAddress(order.address);
+    setEditDeliveryMethod(order.delivery_method || "envio");
+    setEditNotes(order.notes || "");
+    setEditInternalNotes(order.internal_notes || "");
+    setEditStatus(order.status);
+    setEditShippingCost(order.shipping_cost);
+    setEditItems(
+      (order.order_items || []).map((i) => ({
+        id: i.id,
+        product_id: i.product_id,
+        product_name: i.product_name,
+        unit_price: i.unit_price,
+        quantity: i.quantity,
+        subtotal: i.subtotal,
+        image_url: i.image_url,
+      }))
+    );
+    setSelectedProdToAdd("");
+  };
+
+  // Item adjustments in Edit Modal
+  const handleItemQtyChange = (index: number, delta: number) => {
+    setEditItems((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const newQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: newQty, subtotal: item.unit_price * newQty };
+      })
+    );
+  };
+
+  const handleItemRemove = (index: number) => {
+    setEditItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleAddItemFromCatalog = () => {
+    if (!selectedProdToAdd) return;
+    const prod = products.find((p) => p.id === selectedProdToAdd);
+    if (!prod) return;
+
+    // Check if already in items
+    const existingIndex = editItems.findIndex((i) => i.product_id === prod.id);
+    if (existingIndex >= 0) {
+      handleItemQtyChange(existingIndex, 1);
+    } else {
+      const primaryUrl = prod.images?.[0]?.url || "";
+      setEditItems((prev) => [
+        ...prev,
+        {
+          id: `item-${Date.now()}`,
+          product_id: prod.id,
+          product_name: prod.name,
+          unit_price: prod.price,
+          quantity: 1,
+          subtotal: prod.price,
+          image_url: primaryUrl,
+        },
+      ]);
+    }
+    setSelectedProdToAdd("");
+  };
+
+  // Live calculations for Edit Modal
+  const editSubtotal = editItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
+  const editTotal = editSubtotal + (Number(editShippingCost) || 0);
+
+  const handleSaveOrderEdit = async () => {
+    if (!editingOrder) return;
+    if (!editCustomerName.trim() || !editCustomerPhone.trim()) {
+      showToast("Nombre y celular del cliente son requeridos", "error");
+      return;
+    }
+    if (editItems.length === 0) {
+      showToast("El pedido debe tener al menos un producto", "error");
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+      const res = await updateFullOrderAction(editingOrder.id, {
+        customer_name: editCustomerName.trim(),
+        customer_phone: editCustomerPhone.trim(),
+        city: editCity.trim(),
+        neighborhood: editNeighborhood.trim(),
+        address: editAddress.trim(),
+        delivery_method: editDeliveryMethod,
+        notes: editNotes.trim(),
+        internal_notes: editInternalNotes.trim(),
+        status: editStatus,
+        shipping_cost: Number(editShippingCost) || 0,
+        order_items: editItems.map((item) => ({
+          id: item.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          unit_price: item.unit_price,
+          quantity: item.quantity,
+          subtotal: item.unit_price * item.quantity,
+          image_url: item.image_url,
+        })),
+      });
+
+      if (res.success && res.order) {
+        showToast(`Pedido ${editingOrder.code} actualizado correctamente`);
+        const updated = res.order;
+        setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+        if (selectedOrder && selectedOrder.id === updated.id) {
+          setSelectedOrder(updated);
+          setEditingShippingCost(updated.shipping_cost);
+          setEditingInternalNotes(updated.internal_notes || "");
+        }
+        setEditingOrder(null);
+      } else {
+        showToast(res.error || "Error al actualizar el pedido", "error");
+      }
+    } catch {
+      showToast("Error inesperado al guardar el pedido", "error");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!orderToDelete) return;
+    try {
+      setIsDeletingOrder(true);
+      const res = await deleteOrderAction(orderToDelete.id);
+      if (res.success) {
+        showToast(`Pedido ${orderToDelete.code} eliminado correctamente`);
+        setOrders((prev) => prev.filter((o) => o.id !== orderToDelete.id));
+        if (selectedOrder?.id === orderToDelete.id) {
+          setSelectedOrder(null);
+        }
+        setOrderToDelete(null);
+      } else {
+        showToast(res.error || "Error al eliminar el pedido", "error");
+      }
+    } catch {
+      showToast("Error inesperado al eliminar el pedido", "error");
+    } finally {
+      setIsDeletingOrder(false);
+    }
+  };
+
   const handleChangeStatus = async (newStatus: OrderStatus) => {
     if (!selectedOrder) return;
     try {
@@ -97,7 +282,7 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
       if (res.success) {
         showToast(`Estado del pedido ${selectedOrder.code} actualizado a "${newStatus}"`);
         setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
-        setProducts((prev) =>
+        setOrders((prev) =>
           prev.map((o) => (o.id === selectedOrder.id ? { ...o, status: newStatus } : o))
         );
       } else {
@@ -130,7 +315,7 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
               }
             : null
         );
-        setProducts((prev) =>
+        setOrders((prev) =>
           prev.map((o) =>
             o.id === selectedOrder.id
               ? {
@@ -210,11 +395,14 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#F0E8F2]">
         <div>
           <h1 className="text-2xl font-extrabold text-[#2E2A3B] tracking-tight">
-            Gestión de Pedidos
+            Gestión y CRUD de Pedidos
           </h1>
           <p className="text-xs sm:text-sm text-[#7A7590]">
-            Controla pedidos recibidos por WhatsApp, cambia estados y comunícate directamente con tus clientes.
+            Administra, ajusta datos del cliente, modifica o elimina productos solicitados y gestiona entregas.
           </p>
+        </div>
+        <div className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-[#6D4BB8] self-start sm:self-auto">
+          Total pedidos: <strong>{orders.length}</strong>
         </div>
       </div>
 
@@ -260,7 +448,7 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
                 <th className="py-3 px-4">Ciudad / Destino</th>
                 <th className="py-3 px-4">Total (COP)</th>
                 <th className="py-3 px-4 text-center">Estado</th>
-                <th className="py-3 px-4 text-right">Acción</th>
+                <th className="py-3 px-4 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F7F2F9]">
@@ -271,7 +459,7 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
                 return (
                   <tr key={order.id} className="hover:bg-[#FFFBF7]/60 transition-colors">
                     {/* Código */}
-                    <td className="py-3.5 px-4 font-extrabold text-[#6D4BB8]">
+                    <td className="py-3.5 px-4 font-extrabold text-[#6D4BB8] whitespace-nowrap">
                       {order.code}
                     </td>
 
@@ -296,7 +484,7 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
                     </td>
 
                     {/* Total */}
-                    <td className="py-3.5 px-4 font-bold text-[#2E2A3B]">
+                    <td className="py-3.5 px-4 font-bold text-[#2E2A3B] whitespace-nowrap">
                       {formatCOP(order.total)}
                     </td>
 
@@ -310,15 +498,38 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
                       </span>
                     </td>
 
-                    {/* Acciones */}
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDetail(order)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold transition-colors cursor-pointer"
-                      >
-                        <span>Ver Detalle</span>
-                      </button>
+                    {/* Acciones CRUD */}
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1.5 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDetail(order)}
+                          title="Ver Detalle y Factura"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="hidden md:inline">Detalle</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(order)}
+                          title="Editar Pedido / Cambiar productos o datos"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#F0E8F2] hover:bg-[#E5D7EB] text-[#6D4BB8] text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span className="hidden md:inline">Editar</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setOrderToDelete(order)}
+                          title="Eliminar Pedido"
+                          className="p-1.5 rounded-xl hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -371,13 +582,27 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedOrder(null)}
-                className="p-2 rounded-full hover:bg-gray-100 text-[#7A7590]"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ord = selectedOrder;
+                    handleOpenEdit(ord);
+                  }}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#F0E8F2] hover:bg-[#E5D7EB] text-[#6D4BB8] text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Editar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrder(null)}
+                  className="p-2 rounded-full hover:bg-gray-100 text-[#7A7590]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Content */}
@@ -401,7 +626,7 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
                 </a>
               </div>
 
-              {/* Status Change Selector (With automatic inventory discount on 'confirmado') */}
+              {/* Status Change Selector */}
               <div className="p-4 bg-[#FAF5FB] rounded-2xl border border-[#F0E8F2] space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8] block">
                   Cambiar Estado del Pedido
@@ -428,9 +653,18 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
 
               {/* Customer Info */}
               <div className="space-y-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8]">
-                  Datos del Cliente
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8]">
+                    Datos del Cliente
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(selectedOrder)}
+                    className="text-[11px] font-bold text-[#F472A8] hover:underline cursor-pointer"
+                  >
+                    Editar datos
+                  </button>
+                </div>
                 <div className="p-4 rounded-2xl bg-white border border-[#F0E8F2] space-y-2 text-xs">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-[#7A7590]" />
@@ -462,9 +696,18 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
 
               {/* Items List */}
               <div className="space-y-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8]">
-                  Productos del Pedido
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8]">
+                    Productos del Pedido
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(selectedOrder)}
+                    className="text-[11px] font-bold text-[#F472A8] hover:underline cursor-pointer"
+                  >
+                    Ajustar productos
+                  </button>
+                </div>
                 <div className="rounded-2xl border border-[#F0E8F2] overflow-hidden divide-y divide-[#F7F2F9]">
                   {(selectedOrder.order_items || []).map((item) => (
                     <div key={item.id} className="p-3.5 flex items-center justify-between gap-3 text-xs">
@@ -522,14 +765,15 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
                   type="button"
                   disabled={isSavingDetails}
                   onClick={handleSaveDetails}
-                  className="w-full py-2 bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold rounded-xl transition-colors shadow-xs cursor-pointer"
+                  className="w-full py-2 bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold rounded-xl transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  {isSavingDetails ? "Guardando..." : "Guardar Envío y Notas"}
+                  {isSavingDetails && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSavingDetails ? "Guardando..." : "Guardar Envío y Notas"}</span>
                 </button>
               </div>
 
               {/* View Public Invoice Button */}
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 <Link
                   href={`/pedido/${selectedOrder.code}?token=${selectedOrder.public_token}`}
                   target="_blank"
@@ -539,7 +783,438 @@ export function OrdersView({ initialOrders }: OrdersViewProps) {
                   <span>Ver Factura Pública / Descargar PDF</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setOrderToDelete(selectedOrder)}
+                  className="w-full py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar Pedido Definitivamente</span>
+                </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL: EDITAR PEDIDO COMPLETO (CRUD) */}
+      {/* ================================================================= */}
+      {editingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-2xs"
+            onClick={() => !isSavingEdit && setEditingOrder(null)}
+          />
+
+          <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl max-h-[92vh] flex flex-col z-10 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 border-b border-[#F0E8F2] flex items-center justify-between bg-white sticky top-0 z-20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] flex items-center justify-center text-[#6D4BB8]">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-extrabold text-[#2E2A3B]">
+                    Editar Pedido {editingOrder.code}
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-[#7A7590]">
+                    Modifica datos de entrega o ajusta los productos si el cliente cambió de opinión.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={isSavingEdit}
+                onClick={() => setEditingOrder(null)}
+                className="p-2 rounded-full hover:bg-gray-100 text-[#7A7590] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <div className="p-6 space-y-6 flex-1 overflow-y-auto text-xs">
+              {/* Sección 1: Datos del Cliente y Envío */}
+              <div className="space-y-3">
+                <h3 className="font-extrabold text-[#6D4BB8] uppercase tracking-wider text-[11px]">
+                  1. Datos del Cliente y Destino
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Nombre Completo *
+                    </label>
+                    <input
+                      type="text"
+                      value={editCustomerName}
+                      onChange={(e) => setEditCustomerName(e.target.value)}
+                      placeholder="Nombre del cliente"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Teléfono / WhatsApp *
+                    </label>
+                    <input
+                      type="text"
+                      value={editCustomerPhone}
+                      onChange={(e) => setEditCustomerPhone(e.target.value)}
+                      placeholder="Ej: 300 123 4567"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Ciudad *
+                    </label>
+                    <input
+                      type="text"
+                      value={editCity}
+                      onChange={(e) => setEditCity(e.target.value)}
+                      placeholder="Ej: Bogotá"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Barrio *
+                    </label>
+                    <input
+                      type="text"
+                      value={editNeighborhood}
+                      onChange={(e) => setEditNeighborhood(e.target.value)}
+                      placeholder="Ej: Cedritos"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Dirección exacta *
+                    </label>
+                    <input
+                      type="text"
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      placeholder="Ej: Calle 140 # 12-34 Torre 2 Apto 501"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Modalidad de Entrega
+                    </label>
+                    <select
+                      value={editDeliveryMethod}
+                      onChange={(e) => setEditDeliveryMethod(e.target.value as "envio" | "recoger")}
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    >
+                      <option value="envio">Envío a domicilio</option>
+                      <option value="recoger">Recoger en tienda / bodega</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Estado del Pedido
+                    </label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value as OrderStatus)}
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    >
+                      <option value="pendiente">Pendiente</option>
+                      <option value="confirmado">Confirmado</option>
+                      <option value="enviado">Enviado</option>
+                      <option value="entregado">Entregado</option>
+                      <option value="cancelado">Cancelado</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 2: Productos del Pedido */}
+              <div className="space-y-3 pt-4 border-t border-[#F0E8F2]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-extrabold text-[#6D4BB8] uppercase tracking-wider text-[11px]">
+                      2. Productos Solicitados ({editItems.length})
+                    </h3>
+                    <p className="text-[11px] text-[#7A7590]">
+                      Ajusta la cantidad, elimina artículos descartados o agrega uno nuevo del catálogo.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Selector para agregar producto desde catálogo */}
+                {products.length > 0 && (
+                  <div className="flex items-center gap-2 p-3 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2]">
+                    <select
+                      value={selectedProdToAdd}
+                      onChange={(e) => setSelectedProdToAdd(e.target.value)}
+                      className="flex-1 p-2 rounded-xl bg-white border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8] text-xs"
+                    >
+                      <option value="">-- Seleccionar producto para agregar al pedido --</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({formatCOP(p.price)}) {p.stock <= 0 ? "- Sin stock" : `[${p.stock} disp.]`}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddItemFromCatalog}
+                      disabled={!selectedProdToAdd}
+                      className="px-3.5 py-2 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Lista de productos en edición */}
+                <div className="rounded-2xl border border-[#F0E8F2] divide-y divide-[#F7F2F9] overflow-hidden bg-white">
+                  {editItems.map((item, index) => (
+                    <div key={item.id || index} className="p-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.product_name}
+                            className="w-10 h-10 rounded-xl object-cover border border-[#F0E8F2] shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] flex items-center justify-center text-[#6D4BB8] shrink-0">
+                            <Package className="w-5 h-5" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-bold text-[#2E2A3B] truncate">{item.product_name}</p>
+                          <p className="text-[11px] text-[#7A7590]">
+                            Precio unitario: {formatCOP(item.unit_price)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {/* Controles de cantidad */}
+                        <div className="flex items-center gap-1 bg-[#FAF5FB] rounded-xl border border-[#F0E8F2] p-1">
+                          <button
+                            type="button"
+                            onClick={() => handleItemQtyChange(index, -1)}
+                            disabled={item.quantity <= 1}
+                            className="w-6 h-6 rounded-lg bg-white border border-[#F0E8F2] hover:bg-gray-100 disabled:opacity-40 flex items-center justify-center text-[#2E2A3B] cursor-pointer"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-7 text-center font-extrabold text-[#2E2A3B] text-xs">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleItemQtyChange(index, 1)}
+                            className="w-6 h-6 rounded-lg bg-white border border-[#F0E8F2] hover:bg-gray-100 flex items-center justify-center text-[#2E2A3B] cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        {/* Subtotal del ítem */}
+                        <span className="font-extrabold text-[#6D4BB8] text-xs w-24 text-right">
+                          {formatCOP(item.unit_price * item.quantity)}
+                        </span>
+
+                        {/* Botón eliminar ítem */}
+                        <button
+                          type="button"
+                          onClick={() => handleItemRemove(index)}
+                          title="Quitar producto del pedido"
+                          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {editItems.length === 0 && (
+                    <div className="p-6 text-center text-[#7A7590]">
+                      <AlertTriangle className="w-6 h-6 text-amber-500 mx-auto mb-1" />
+                      <p className="font-semibold text-xs text-rose-500">
+                        No hay productos en este pedido. Debes agregar al menos uno.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sección 3: Costo de Envío, Notas y Resumen Financiero */}
+              <div className="space-y-4 pt-4 border-t border-[#F0E8F2]">
+                <h3 className="font-extrabold text-[#6D4BB8] uppercase tracking-wider text-[11px]">
+                  3. Envío, Notas y Totales
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Costo de Envío (COP)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editShippingCost}
+                      onChange={(e) => setEditShippingCost(Number(e.target.value) || 0)}
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-extrabold text-[#2E2A3B] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Notas del Cliente
+                    </label>
+                    <input
+                      type="text"
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Instrucciones adicionales del cliente"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Notas Internas del Equipo Alyshop
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editInternalNotes}
+                      onChange={(e) => setEditInternalNotes(e.target.value)}
+                      placeholder="Anotaciones privadas para seguimiento interno del despacho..."
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+                </div>
+
+                {/* Recuadro de Totales Recalculados */}
+                <div className="p-4 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] space-y-1.5 text-xs">
+                  <div className="flex justify-between text-[#7A7590]">
+                    <span>Subtotal de productos ({editItems.reduce((a, b) => a + b.quantity, 0)} unidades):</span>
+                    <span className="font-bold text-[#2E2A3B]">{formatCOP(editSubtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-[#7A7590]">
+                    <span>Costo de envío:</span>
+                    <span className="font-bold text-[#2E2A3B]">{formatCOP(Number(editShippingCost) || 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-extrabold pt-2 border-t border-[#F0E8F2]">
+                    <span className="text-[#2E2A3B]">Total a Cobrar:</span>
+                    <span className="text-[#6D4BB8] text-base">{formatCOP(editTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="p-4 border-t border-[#F0E8F2] bg-[#FAF5FB] flex items-center justify-end gap-3 sticky bottom-0 z-20">
+              <button
+                type="button"
+                disabled={isSavingEdit}
+                onClick={() => setEditingOrder(null)}
+                className="px-4 py-2.5 rounded-xl border border-[#F0E8F2] text-xs font-bold text-[#7A7590] hover:bg-white transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={isSavingEdit}
+                onClick={handleSaveOrderEdit}
+                className="px-6 py-2.5 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSavingEdit ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Guardando cambios...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Guardar Cambios del Pedido</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL: CONFIRMAR ELIMINACIÓN DE PEDIDO (CRUD) */}
+      {/* ================================================================= */}
+      {orderToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-2xs"
+            onClick={() => !isDeletingOrder && setOrderToDelete(null)}
+          />
+
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-extrabold text-[#2E2A3B]">
+                ¿Eliminar pedido {orderToDelete.code}?
+              </h3>
+              <p className="text-xs text-[#7A7590] leading-relaxed">
+                Estás a punto de eliminar de forma permanente el pedido de{" "}
+                <strong className="text-[#2E2A3B]">{orderToDelete.customer_name}</strong> por valor de{" "}
+                <strong className="text-[#6D4BB8]">{formatCOP(orderToDelete.total)}</strong>. Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="p-3 bg-[#FAF5FB] rounded-xl border border-[#F0E8F2] text-xs text-[#7A7590]">
+              <p>Código: <strong className="text-[#2E2A3B]">{orderToDelete.code}</strong></p>
+              <p>Fecha: {new Date(orderToDelete.created_at).toLocaleDateString("es-CO")}</p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingOrder}
+                onClick={() => setOrderToDelete(null)}
+                className="px-4 py-2.5 rounded-xl border border-[#F0E8F2] text-xs font-bold text-[#7A7590] hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeletingOrder}
+                onClick={handleConfirmDelete}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingOrder ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Sí, Eliminar Pedido</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

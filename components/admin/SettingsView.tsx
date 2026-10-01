@@ -249,12 +249,21 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
 
         {/* Section 4: Redes Sociales */}
         <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-stone-900 font-bold border-b border-stone-100 pb-3">
-            <Share2 className="w-5 h-5 text-indigo-500" />
-            <h2 className="text-base">Redes Sociales</h2>
+          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+            <div className="flex items-center gap-2 text-stone-900 font-bold">
+              <Share2 className="w-5 h-5 text-indigo-500" />
+              <h2 className="text-base">Redes Sociales</h2>
+            </div>
+            <span className="text-[11px] text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full font-medium">
+              Aparecen en el pie de página
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <p className="text-xs text-stone-500">
+            Ingresa las direcciones de tus perfiles. Si dejas un campo vacío, ese ícono no se mostrará a los clientes. Ya no necesitas configurar variables en el archivo <code>.env</code>.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
                 Enlace a Instagram
@@ -263,20 +272,33 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
                 type="url"
                 value={settings.instagram_url || ""}
                 onChange={(e) => setSettings({ ...settings, instagram_url: e.target.value })}
-                placeholder="https://instagram.com/alyshop_co"
+                placeholder="https://instagram.com/tu_cuenta"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                Enlace a Facebook / Fanpage
+                Enlace a Facebook
               </label>
               <input
                 type="url"
                 value={settings.facebook_url || ""}
                 onChange={(e) => setSettings({ ...settings, facebook_url: e.target.value })}
-                placeholder="https://facebook.com/alyshop"
+                placeholder="https://facebook.com/tu_pagina"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                Enlace a TikTok
+              </label>
+              <input
+                type="url"
+                value={settings.tiktok_url || ""}
+                onChange={(e) => setSettings({ ...settings, tiktok_url: e.target.value })}
+                placeholder="https://tiktok.com/@tu_cuenta"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
               />
             </div>

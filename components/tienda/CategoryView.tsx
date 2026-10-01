@@ -20,7 +20,7 @@ export function CategoryView({
   categories,
   slug,
 }: CategoryViewProps) {
-  // Filter and sort states
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("todas");
   const [minPrice, setMinPrice] = useState<string>("");
   const [maxPrice, setMaxPrice] = useState<string>("");
   const [onlyAvailable, setOnlyAvailable] = useState<boolean>(false);
@@ -31,6 +31,9 @@ export function CategoryView({
   const filteredProducts = useMemo(() => {
     return initialProducts
       .filter((p) => {
+        if (selectedSubcategory !== "todas" && p.subcategory !== selectedSubcategory) {
+          return false;
+        }
         if (onlyAvailable && p.stock <= 0) return false;
         if (minPrice && p.price < Number(minPrice)) return false;
         if (maxPrice && p.price > Number(maxPrice)) return false;
@@ -42,11 +45,12 @@ export function CategoryView({
         if (sortBy === "nombre") return a.name.localeCompare(b.name);
         return 0; // recientes (default order)
       });
-  }, [initialProducts, onlyAvailable, minPrice, maxPrice, sortBy]);
+  }, [initialProducts, selectedSubcategory, onlyAvailable, minPrice, maxPrice, sortBy]);
 
-  const hasActiveFilters = Boolean(minPrice || maxPrice || onlyAvailable);
+  const hasActiveFilters = Boolean(minPrice || maxPrice || onlyAvailable || selectedSubcategory !== "todas");
 
   const resetFilters = () => {
+    setSelectedSubcategory("todas");
     setMinPrice("");
     setMaxPrice("");
     setOnlyAvailable(false);
@@ -96,6 +100,43 @@ export function CategoryView({
             </p>
           </div>
         </div>
+
+        {/* Subcategories Filter Pills */}
+        {category?.subcategories && category.subcategories.length > 0 && (
+          <div className="pt-5 mt-4 border-t border-black/5 flex items-center gap-2 overflow-x-auto no-scrollbar relative z-10">
+            <span className="text-xs font-bold text-[#6D4BB8] shrink-0 mr-1">
+              Subcategorías:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedSubcategory("todas")}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                selectedSubcategory === "todas"
+                  ? "bg-[#6D4BB8] text-white shadow-xs"
+                  : "bg-white/90 border border-[#F0E8F2] text-[#7A7590] hover:text-[#6D4BB8]"
+              }`}
+            >
+              Todas
+            </button>
+            {category.subcategories.map((sub) => {
+              const isSelected = selectedSubcategory === sub;
+              return (
+                <button
+                  key={sub}
+                  type="button"
+                  onClick={() => setSelectedSubcategory(isSelected ? "todas" : sub)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    isSelected
+                      ? "bg-[#6D4BB8] text-white shadow-xs"
+                      : "bg-white/90 border border-[#F0E8F2] text-[#7A7590] hover:text-[#6D4BB8]"
+                  }`}
+                >
+                  {sub}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Main Layout: Left Sidebar + Product Grid */}

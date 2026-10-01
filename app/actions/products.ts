@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Product } from "@/types";
 import { MOCK_PRODUCTS } from "@/lib/mock-data";
+import { getSubcategoriesConfig } from "./categories";
 
 // Fallback products in-memory store for local demo mode
 const globalForProducts = global as unknown as { adminProducts: Product[] };
@@ -28,10 +29,12 @@ export async function getAllAdminProducts(): Promise<Product[]> {
         .order("created_at", { ascending: false });
 
       if (!error && data && data.length > 0) {
+        const subConfig = await getSubcategoriesConfig(supabase);
         const mapped = data.map((item: any) => ({
           id: item.id,
           category_id: item.category_id,
           category_name: item.categories?.name || "",
+          subcategory: subConfig.products[item.id] || "",
           name: item.name,
           slug: item.slug,
           description: item.description || "",
@@ -142,6 +145,19 @@ export async function saveProductAction(productData: Partial<Product>): Promise<
         }));
         await supabase.from("product_images").insert(imgRows);
       }
+
+      if (productData.subcategory !== undefined) {
+        const subConfig = await getSubcategoriesConfig(supabase);
+        if (productData.subcategory) {
+          subConfig.products[finalId] = productData.subcategory;
+        } else {
+          delete subConfig.products[finalId];
+        }
+        await supabase.from("settings").upsert({
+          key: "subcategories_config",
+          value: subConfig,
+        });
+      }
     }
 
     // Local in-memory update
@@ -149,6 +165,7 @@ export async function saveProductAction(productData: Partial<Product>): Promise<
       id: productId,
       category_id: productData.category_id || "",
       category_name: productData.category_name || "",
+      subcategory: productData.subcategory || "",
       name: productData.name || "Nuevo producto",
       slug: productData.slug || `producto-${Date.now()}`,
       description: productData.description || "",
@@ -195,6 +212,14 @@ export async function deleteProductAction(
         await supabase.from("products").update({ is_active: false }).eq("id", productId);
       } else {
         await supabase.from("products").delete().eq("id", productId);
+        const subConfig = await getSubcategoriesConfig(supabase);
+        if (subConfig.products[productId]) {
+          delete subConfig.products[productId];
+          await supabase.from("settings").upsert({
+            key: "subcategories_config",
+            value: subConfig,
+          });
+        }
       }
     }
 

@@ -9,7 +9,10 @@ import { Category, Product, BannerSlide } from "@/types";
 /**
  * Helper to map DB record to Product interface
  */
-function mapDbProduct(item: any): Product {
+/**
+ * Helper to map DB record to Product interface
+ */
+function mapDbProduct(item: any, subcategoryMap?: Record<string, string>): Product {
   const images = (item.product_images || []).map((img: any) => ({
     id: img.id,
     url: img.url,
@@ -21,6 +24,7 @@ function mapDbProduct(item: any): Product {
     id: item.id,
     category_id: item.category_id,
     category_name: item.categories?.name || "",
+    subcategory: (subcategoryMap && subcategoryMap[item.id]) || "",
     name: item.name,
     slug: item.slug,
     description: item.description || "",
@@ -44,6 +48,28 @@ function mapDbProduct(item: any): Product {
 }
 
 /**
+ * Helper to fetch subcategories configuration from settings
+ */
+async function getSubcategoriesConfigQuery(supabase: any): Promise<{
+  categories: Record<string, string[]>;
+  products: Record<string, string>;
+}> {
+  try {
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "subcategories_config")
+      .single();
+    return {
+      categories: data?.value?.categories || {},
+      products: data?.value?.products || {},
+    };
+  } catch {
+    return { categories: {}, products: {} };
+  }
+}
+
+/**
  * Fetch all active categories from Supabase, ordered by sort_order.
  */
 export async function getCategories(): Promise<Category[]> {
@@ -61,6 +87,7 @@ export async function getCategories(): Promise<Category[]> {
       return MOCK_CATEGORIES;
     }
 
+    const subConfig = await getSubcategoriesConfigQuery(supabase);
     return data.map((item: any) => ({
       id: item.id,
       name: item.name,
@@ -69,6 +96,7 @@ export async function getCategories(): Promise<Category[]> {
       color: item.color || "#FCE4EF",
       sort_order: item.sort_order || 0,
       is_active: item.is_active,
+      subcategories: subConfig.categories[item.id] || [],
     }));
   } catch (err) {
     console.error("Error fetching categories from Supabase:", err);
@@ -136,8 +164,11 @@ export async function getFeaturedProducts(): Promise<Product[]> {
       return MOCK_PRODUCTS;
     }
 
-    const orderList = await getProductsDisplayOrder(supabase);
-    const mapped = data.map(mapDbProduct);
+    const [orderList, subConfig] = await Promise.all([
+      getProductsDisplayOrder(supabase),
+      getSubcategoriesConfigQuery(supabase),
+    ]);
+    const mapped = data.map((item: any) => mapDbProduct(item, subConfig.products));
     return sortProductsByDisplayOrder(mapped, orderList);
   } catch (err) {
     console.error("Error fetching products from Supabase:", err);
@@ -179,7 +210,8 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       return found || null;
     }
 
-    return mapDbProduct(data);
+    const subConfig = await getSubcategoriesConfigQuery(supabase);
+    return mapDbProduct(data, subConfig.products);
   } catch (err) {
     console.error(`Error fetching product by slug ${slug}:`, err);
     const found = MOCK_PRODUCTS.find((p) => p.slug === slug);
@@ -245,8 +277,11 @@ export async function getProductsByCategory(
       return { category, products: filtered };
     }
 
-    const orderList = await getProductsDisplayOrder(supabase);
-    const mapped = data.map(mapDbProduct);
+    const [orderList, subConfig] = await Promise.all([
+      getProductsDisplayOrder(supabase),
+      getSubcategoriesConfigQuery(supabase),
+    ]);
+    const mapped = data.map((item: any) => mapDbProduct(item, subConfig.products));
     return {
       category,
       products: sortProductsByDisplayOrder(mapped, orderList),
@@ -300,7 +335,7 @@ export async function getRelatedProducts(
       return MOCK_PRODUCTS.filter((p) => p.id !== excludeProductId).slice(0, limit);
     }
 
-    return data.map(mapDbProduct);
+    return data.map((item: any) => mapDbProduct(item));
   } catch (err) {
     console.error("Error fetching related products:", err);
     return MOCK_PRODUCTS.filter((p) => p.id !== excludeProductId).slice(0, limit);
@@ -356,7 +391,8 @@ export async function searchProducts(query: string): Promise<Product[]> {
       });
     }
 
-    return data.map(mapDbProduct);
+    const subConfig = await getSubcategoriesConfigQuery(supabase);
+    return data.map((item: any) => mapDbProduct(item, subConfig.products));
   } catch (err) {
     console.error(`Error searching products for query "${query}":`, err);
     return MOCK_PRODUCTS.filter((p) => p.name.toLowerCase().includes(clean));

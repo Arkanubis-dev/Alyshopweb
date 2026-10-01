@@ -9,8 +9,9 @@ const DEFAULT_SETTINGS: StoreSettings = {
   slogan: "Todo lo que necesitas, en un solo lugar",
   city: "Bogotá",
   whatsapp_number: "573213052913",
-  instagram_url: "https://instagram.com",
-  facebook_url: "https://facebook.com",
+  instagram_url: "",
+  facebook_url: "",
+  tiktok_url: "",
   default_shipping_cost: 0,
   low_stock_threshold: 3,
   footer_invoice_text:
@@ -41,8 +42,9 @@ export async function getAdminSettingsAction(): Promise<StoreSettings> {
           slogan: map.store_info?.slogan || DEFAULT_SETTINGS.slogan,
           city: map.store_info?.city || DEFAULT_SETTINGS.city,
           whatsapp_number: map.whatsapp?.number || DEFAULT_SETTINGS.whatsapp_number,
-          instagram_url: map.social?.instagram || DEFAULT_SETTINGS.instagram_url,
-          facebook_url: map.social?.facebook || DEFAULT_SETTINGS.facebook_url,
+          instagram_url: map.social?.instagram ?? (process.env.NEXT_PUBLIC_INSTAGRAM_URL || ""),
+          facebook_url: map.social?.facebook ?? (process.env.NEXT_PUBLIC_FACEBOOK_URL || ""),
+          tiktok_url: map.social?.tiktok ?? (process.env.NEXT_PUBLIC_TIKTOK_URL || ""),
           default_shipping_cost: Number(map.shipping?.default_cost ?? 0),
           low_stock_threshold: Number(map.store_info?.low_stock_threshold ?? 3),
           footer_invoice_text:
@@ -89,8 +91,9 @@ export async function saveAdminSettingsAction(
         {
           key: "social",
           value: {
-            instagram: newSettings.instagram_url,
-            facebook: newSettings.facebook_url,
+            instagram: newSettings.instagram_url || "",
+            facebook: newSettings.facebook_url || "",
+            tiktok: newSettings.tiktok_url || "",
           },
         },
       ]);

@@ -14,6 +14,27 @@ if (process.env.NODE_ENV !== "production") {
   globalForCategories.adminCategories = adminCategoriesStore;
 }
 
+export async function getSubcategoriesConfig(supabaseClient?: any): Promise<{
+  categories: Record<string, string[]>;
+  products: Record<string, string>;
+}> {
+  try {
+    const supabase = supabaseClient || createAdminClient();
+    if (!supabase) return { categories: {}, products: {} };
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "subcategories_config")
+      .single();
+    return {
+      categories: data?.value?.categories || {},
+      products: data?.value?.products || {},
+    };
+  } catch {
+    return { categories: {}, products: {} };
+  }
+}
+
 export async function getAllAdminCategories(): Promise<Category[]> {
   try {
     const supabase = createAdminClient();
@@ -24,6 +45,7 @@ export async function getAllAdminCategories(): Promise<Category[]> {
         .order("sort_order", { ascending: true });
 
       if (!error && data && data.length > 0) {
+        const subConfig = await getSubcategoriesConfig(supabase);
         return data.map((item: any) => ({
           id: item.id,
           name: item.name,
@@ -32,6 +54,7 @@ export async function getAllAdminCategories(): Promise<Category[]> {
           color: item.color || "#FCE4EF",
           sort_order: item.sort_order || 0,
           is_active: item.is_active,
+          subcategories: subConfig.categories[item.id] || [],
         }));
       }
     }
@@ -72,6 +95,15 @@ export async function saveCategoryAction(categoryData: Partial<Category>): Promi
           .eq("id", categoryId);
         if (error) throw error;
       }
+
+      if (categoryData.subcategories !== undefined) {
+        const subConfig = await getSubcategoriesConfig(supabase);
+        subConfig.categories[categoryId] = categoryData.subcategories;
+        await supabase.from("settings").upsert({
+          key: "subcategories_config",
+          value: subConfig,
+        });
+      }
     }
 
     const newCategory: Category = {
@@ -82,6 +114,7 @@ export async function saveCategoryAction(categoryData: Partial<Category>): Promi
       color: categoryData.color || "#FCE4EF",
       sort_order: categoryData.sort_order || 0,
       is_active: categoryData.is_active ?? true,
+      subcategories: categoryData.subcategories || [],
     };
 
     const idx = adminCategoriesStore.findIndex((c) => c.id === categoryId);
@@ -131,6 +164,15 @@ export async function deleteCategoryAction(
 
       const { error } = await supabase.from("categories").delete().eq("id", categoryId);
       if (error) throw error;
+
+      const subConfig = await getSubcategoriesConfig(supabase);
+      if (subConfig.categories[categoryId]) {
+        delete subConfig.categories[categoryId];
+        await supabase.from("settings").upsert({
+          key: "subcategories_config",
+          value: subConfig,
+        });
+      }
     }
 
     const idx = adminCategoriesStore.findIndex((c) => c.id === categoryId);

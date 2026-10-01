@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { getAllAdminOrdersAction } from "@/app/actions/orders";
+import { getAllAdminProducts } from "@/app/actions/products";
 import { OrdersView } from "@/components/admin/OrdersView";
 
 export const metadata: Metadata = {
@@ -10,7 +11,11 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminPedidosPage() {
-  const orders = await getAllAdminOrdersAction();
+  const [orders, products] = await Promise.all([
+    getAllAdminOrdersAction(),
+    getAllAdminProducts(),
+  ]);
 
-  return <OrdersView initialOrders={orders} />;
+  return <OrdersView initialOrders={orders} products={products} />;
 }
+

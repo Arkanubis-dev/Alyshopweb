@@ -7,6 +7,7 @@ export interface Category {
   sort_order: number;
   is_active: boolean;
   item_count?: number;
+  subcategories?: string[];
 }
 
 export interface ProductImage {
@@ -20,6 +21,7 @@ export interface Product {
   id: string;
   category_id: string;
   category_name?: string;
+  subcategory?: string;
   name: string;
   slug: string;
   description: string;
@@ -82,6 +84,28 @@ export interface Order {
   order_items?: OrderItem[];
 }
 
+export interface UpdateOrderInput {
+  customer_name?: string;
+  customer_phone?: string;
+  city?: string;
+  neighborhood?: string;
+  address?: string;
+  notes?: string;
+  delivery_method?: "envio" | "recoger";
+  shipping_cost?: number;
+  status?: OrderStatus;
+  internal_notes?: string;
+  order_items?: {
+    id?: string;
+    product_id?: string;
+    product_name: string;
+    unit_price: number;
+    quantity: number;
+    subtotal?: number;
+    image_url?: string;
+  }[];
+}
+
 export interface CheckoutFormData {
   customer_name: string;
   customer_phone: string;
@@ -112,6 +136,7 @@ export interface StoreSettings {
   whatsapp_number: string;
   instagram_url?: string;
   facebook_url?: string;
+  tiktok_url?: string;
   default_shipping_cost: number;
   low_stock_threshold: number;
   footer_invoice_text: string;
@@ -136,3 +161,4 @@ export interface TrustItem {
   description: string;
   icon: string;
 }
+

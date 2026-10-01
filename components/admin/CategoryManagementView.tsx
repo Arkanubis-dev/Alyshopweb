@@ -172,6 +172,33 @@ export function CategoryManagementView({
     return products.filter((p) => p.category_id === catId).length;
   };
 
+  const [newSubcategoryInput, setNewSubcategoryInput] = useState("");
+
+  const handleAddSubcategory = () => {
+    const trimmed = newSubcategoryInput.trim();
+    if (!trimmed || !editingCategory) return;
+    const current = editingCategory.subcategories || [];
+    if (current.includes(trimmed)) {
+      showToast("Esa subcategoría ya existe", "error");
+      return;
+    }
+    setEditingCategory({
+      ...editingCategory,
+      subcategories: [...current, trimmed],
+    });
+    setNewSubcategoryInput("");
+  };
+
+  const handleRemoveSubcategory = (index: number) => {
+    if (!editingCategory?.subcategories) return;
+    const current = [...editingCategory.subcategories];
+    current.splice(index, 1);
+    setEditingCategory({
+      ...editingCategory,
+      subcategories: current,
+    });
+  };
+
   const handleOpenCreate = () => {
     setEditingCategory({
       name: "",
@@ -180,12 +207,18 @@ export function CategoryManagementView({
       color: "#FCE4EF",
       sort_order: categories.length + 1,
       is_active: true,
+      subcategories: [],
     });
+    setNewSubcategoryInput("");
     setIsDrawerOpen(true);
   };
 
   const handleOpenEdit = (category: Category) => {
-    setEditingCategory({ ...category });
+    setEditingCategory({
+      ...category,
+      subcategories: category.subcategories || [],
+    });
+    setNewSubcategoryInput("");
     setIsDrawerOpen(true);
   };
 
@@ -431,9 +464,21 @@ export function CategoryManagementView({
                       </div>
                     </td>
 
-                    {/* Name */}
-                    <td className="py-3 px-4 font-bold text-[#2E2A3B]">
-                      {cat.name}
+                    {/* Name and Subcategories */}
+                    <td className="py-3 px-4">
+                      <p className="font-bold text-[#2E2A3B]">{cat.name}</p>
+                      {cat.subcategories && cat.subcategories.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {cat.subcategories.map((sub) => (
+                            <span
+                              key={sub}
+                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#FAF5FB] border border-[#F0E8F2] text-[#6D4BB8] font-medium"
+                            >
+                              {sub}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
 
                     {/* Slug */}
@@ -601,6 +646,70 @@ export function CategoryManagementView({
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Subcategorías (Opcionales) */}
+                <div className="space-y-2 p-3.5 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[#2E2A3B]">
+                      Subcategorías (Opcional)
+                    </label>
+                    <span className="text-[10px] text-[#7A7590] bg-white px-2 py-0.5 rounded-full border border-[#F0E8F2]">
+                      {editingCategory.subcategories?.length || 0} agregadas
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#7A7590]">
+                    Crea subdivisiones para organizar productos dentro de esta categoría (ej: Hombre, Mujer, Splash).
+                  </p>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSubcategoryInput}
+                      onChange={(e) => setNewSubcategoryInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddSubcategory();
+                        }
+                      }}
+                      placeholder="Ej: Hombre, Mujer, Unisex..."
+                      className="flex-1 text-xs p-2.5 rounded-xl bg-white border border-[#F0E8F2] focus:outline-none focus:border-[#6D4BB8]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddSubcategory}
+                      className="px-3 py-2 bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold rounded-xl transition-colors shrink-0 cursor-pointer"
+                    >
+                      + Agregar
+                    </button>
+                  </div>
+
+                  {/* Chips de subcategorías */}
+                  {editingCategory.subcategories && editingCategory.subcategories.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {editingCategory.subcategories.map((sub, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#E4D9EB] text-xs font-medium text-[#6D4BB8]"
+                        >
+                          <span>{sub}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSubcategory(idx)}
+                            className="text-gray-400 hover:text-rose-600 rounded-full cursor-pointer"
+                            title="Quitar subcategoría"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-gray-400 italic pt-1">
+                      Sin subcategorías (los productos se mostrarán directamente en la categoría principal).
+                    </p>
+                  )}
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] space-y-1">

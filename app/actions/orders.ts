@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { Order, OrderStatus } from "@/types";
+import { Order, OrderStatus, UpdateOrderInput } from "@/types";
 import { fallbackOrders } from "@/lib/orders-cache";
 import { updateProductStockAction } from "./inventory";
 import { getAllAdminProducts } from "./products";
@@ -188,3 +188,144 @@ export async function updateOrderDetailsAction(
     return { success: false, error: err.message };
   }
 }
+
+export async function updateFullOrderAction(
+  orderId: string,
+  input: UpdateOrderInput
+): Promise<{ success: boolean; error?: string; order?: Order }> {
+  try {
+    const orders = await getAllAdminOrdersAction();
+    const order = orders.find((o) => o.id === orderId || o.code === orderId);
+    if (!order) return { success: false, error: "Pedido no encontrado" };
+
+    const supabase = createAdminClient();
+
+    // 1. Recalculate items and subtotal if order_items are provided
+    let newItems = order.order_items || [];
+    let subtotal = order.subtotal;
+
+    if (input.order_items) {
+      newItems = input.order_items.map((item, idx) => {
+        const qty = Math.max(1, Number(item.quantity));
+        const price = Number(item.unit_price);
+        return {
+          id: item.id || `item-${Date.now()}-${idx}`,
+          order_id: order.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          unit_price: price,
+          quantity: qty,
+          subtotal: price * qty,
+          image_url: item.image_url,
+        };
+      });
+      subtotal = newItems.reduce((acc, i) => acc + i.subtotal, 0);
+
+      // If connected to Supabase, update order_items table
+      if (supabase) {
+        // Delete old items and insert current items
+        await supabase.from("order_items").delete().eq("order_id", order.id);
+        if (newItems.length > 0) {
+          const insertPayload = newItems.map((i) => ({
+            order_id: order.id,
+            product_id: i.product_id || null,
+            product_name: i.product_name,
+            unit_price: i.unit_price,
+            quantity: i.quantity,
+            subtotal: i.subtotal,
+            image_url: i.image_url || null,
+          }));
+          const { error: itemsError } = await supabase.from("order_items").insert(insertPayload);
+          if (itemsError) {
+            console.error("Error updating order_items in Supabase:", itemsError);
+          }
+        }
+      }
+    }
+
+    const shippingCost = input.shipping_cost !== undefined ? Number(input.shipping_cost) : order.shipping_cost;
+    const total = subtotal + shippingCost;
+    const newStatus = input.status || order.status;
+
+    // 2. Update orders table in Supabase
+    if (supabase) {
+      const updatePayload: Record<string, any> = {
+        customer_name: input.customer_name ?? order.customer_name,
+        customer_phone: input.customer_phone ?? order.customer_phone,
+        city: input.city ?? order.city,
+        neighborhood: input.neighborhood ?? order.neighborhood,
+        address: input.address ?? order.address,
+        notes: input.notes !== undefined ? input.notes : order.notes,
+        delivery_method: input.delivery_method ?? order.delivery_method,
+        subtotal,
+        shipping_cost: shippingCost,
+        total,
+        status: newStatus,
+        internal_notes: input.internal_notes !== undefined ? input.internal_notes : order.internal_notes,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: orderError } = await supabase
+        .from("orders")
+        .update(updatePayload)
+        .eq("id", order.id);
+
+      if (orderError) throw orderError;
+    }
+
+    // 3. Update local cache
+    const updatedOrder: Order = {
+      ...order,
+      customer_name: input.customer_name ?? order.customer_name,
+      customer_phone: input.customer_phone ?? order.customer_phone,
+      city: input.city ?? order.city,
+      neighborhood: input.neighborhood ?? order.neighborhood,
+      address: input.address ?? order.address,
+      notes: input.notes !== undefined ? input.notes : order.notes,
+      delivery_method: input.delivery_method ?? order.delivery_method,
+      subtotal,
+      shipping_cost: shippingCost,
+      total,
+      status: newStatus,
+      internal_notes: input.internal_notes !== undefined ? input.internal_notes : order.internal_notes,
+      order_items: newItems,
+    };
+
+    fallbackOrders.set(order.code, updatedOrder);
+
+    revalidatePath("/admin/pedidos");
+    revalidatePath(`/pedido/${order.code}`);
+    revalidatePath("/admin");
+    return { success: true, order: updatedOrder };
+  } catch (err: any) {
+    console.error("Error in updateFullOrderAction:", err);
+    return { success: false, error: err.message || "Error al actualizar el pedido" };
+  }
+}
+
+export async function deleteOrderAction(
+  orderId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const orders = await getAllAdminOrdersAction();
+    const order = orders.find((o) => o.id === orderId || o.code === orderId);
+    if (!order) return { success: false, error: "Pedido no encontrado" };
+
+    const supabase = createAdminClient();
+    if (supabase) {
+      await supabase.from("order_items").delete().eq("order_id", order.id);
+      const { error } = await supabase.from("orders").delete().eq("id", order.id);
+      if (error) throw error;
+    }
+
+    fallbackOrders.delete(order.code);
+
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in deleteOrderAction:", err);
+    return { success: false, error: err.message || "Error al eliminar el pedido" };
+  }
+}
+
