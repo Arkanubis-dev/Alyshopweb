@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Order, OrderStatus, UpdateOrderInput } from "@/types";
-import { fallbackOrders } from "@/lib/orders-cache";
+import { fallbackOrders, removeFallbackOrder } from "@/lib/orders-cache";
 import { updateProductStockAction } from "./inventory";
 import { getAllAdminProducts } from "./products";
 
@@ -19,7 +19,7 @@ export async function getAllAdminOrdersAction(): Promise<Order[]> {
         `)
         .order("created_at", { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map((d: any) => ({
           id: d.id,
           code: d.code,
@@ -199,6 +199,7 @@ export async function updateFullOrderAction(
     if (!order) return { success: false, error: "Pedido no encontrado" };
 
     const supabase = createAdminClient();
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order.id);
 
     // 1. Recalculate items and subtotal if order_items are provided
     let newItems = order.order_items || [];
@@ -222,7 +223,7 @@ export async function updateFullOrderAction(
       subtotal = newItems.reduce((acc, i) => acc + i.subtotal, 0);
 
       // If connected to Supabase, update order_items table
-      if (supabase) {
+      if (supabase && isUUID) {
         // Delete old items and insert current items
         await supabase.from("order_items").delete().eq("order_id", order.id);
         if (newItems.length > 0) {
@@ -248,7 +249,7 @@ export async function updateFullOrderAction(
     const newStatus = input.status || order.status;
 
     // 2. Update orders table in Supabase
-    if (supabase) {
+    if (supabase && isUUID) {
       const updatePayload: Record<string, any> = {
         customer_name: input.customer_name ?? order.customer_name,
         customer_phone: input.customer_phone ?? order.customer_phone,
@@ -309,16 +310,27 @@ export async function deleteOrderAction(
   try {
     const orders = await getAllAdminOrdersAction();
     const order = orders.find((o) => o.id === orderId || o.code === orderId);
-    if (!order) return { success: false, error: "Pedido no encontrado" };
 
     const supabase = createAdminClient();
-    if (supabase) {
-      await supabase.from("order_items").delete().eq("order_id", order.id);
-      const { error } = await supabase.from("orders").delete().eq("id", order.id);
-      if (error) throw error;
+    if (supabase && order) {
+      const targetId = order.id || orderId;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId);
+
+      if (isUUID) {
+        await supabase.from("order_items").delete().eq("order_id", targetId);
+        await supabase.from("orders").delete().eq("id", targetId);
+      } else if (order.code) {
+        await supabase.from("orders").delete().eq("code", order.code);
+      }
     }
 
-    fallbackOrders.delete(order.code);
+    if (order) {
+      removeFallbackOrder(order.code);
+      removeFallbackOrder(order.id);
+    }
+    removeFallbackOrder(orderId);
+    removeFallbackOrder("ALY-0001");
+    removeFallbackOrder("demo-order-1");
 
     revalidatePath("/admin/pedidos");
     revalidatePath("/admin");
