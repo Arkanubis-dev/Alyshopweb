@@ -361,3 +361,238 @@ export async function reorderProductsAction(
   }
 }
 
+export async function bulkUpdateProductStatusAction(
+  productIds: string[],
+  isActive: boolean
+): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    if (!productIds || productIds.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    const supabase = createAdminClient();
+    if (supabase) {
+      const { error } = await supabase
+        .from("products")
+        .update({ is_active: isActive })
+        .in("id", productIds);
+      if (error) throw error;
+    }
+
+    // Update in-memory fallback
+    for (let i = 0; i < adminProductsStore.length; i++) {
+      if (productIds.includes(adminProductsStore[i].id)) {
+        adminProductsStore[i] = { ...adminProductsStore[i], is_active: isActive };
+      }
+    }
+
+    revalidatePath("/admin/productos");
+    revalidatePath("/admin");
+    revalidatePath("/categoria/[slug]", "page");
+    revalidatePath("/");
+    return { success: true, count: productIds.length };
+  } catch (err: any) {
+    console.error("Error in bulkUpdateProductStatusAction:", err);
+    return { success: false, count: 0, error: err.message || "Error al actualizar productos" };
+  }
+}
+
+export async function bulkDeleteProductsAction(
+  productIds: string[]
+): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    if (!productIds || productIds.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    const supabase = createAdminClient();
+    if (supabase) {
+      // 1. Delete images
+      await supabase.from("product_images").delete().in("product_id", productIds);
+
+      // 2. Delete products
+      const { error } = await supabase.from("products").delete().in("id", productIds);
+      if (error) throw error;
+
+      // 3. Clean subcategories config
+      const subConfig = await getSubcategoriesConfig(supabase);
+      let changed = false;
+      for (const id of productIds) {
+        if (subConfig.products[id]) {
+          delete subConfig.products[id];
+          changed = true;
+        }
+      }
+      if (changed) {
+        await supabase.from("settings").upsert({
+          key: "subcategories_config",
+          value: subConfig,
+        });
+      }
+    }
+
+    // In-memory fallback
+    for (let i = adminProductsStore.length - 1; i >= 0; i--) {
+      if (productIds.includes(adminProductsStore[i].id)) {
+        adminProductsStore.splice(i, 1);
+      }
+    }
+
+    revalidatePath("/admin/productos");
+    revalidatePath("/admin");
+    revalidatePath("/categoria/[slug]", "page");
+    revalidatePath("/");
+    return { success: true, count: productIds.length };
+  } catch (err: any) {
+    console.error("Error in bulkDeleteProductsAction:", err);
+    return { success: false, count: 0, error: err.message || "Error al eliminar productos" };
+  }
+}
+
+export interface BulkProductInput {
+  name: string;
+  category_id: string;
+  subcategory?: string;
+  description?: string;
+  detail?: string;
+  brand?: string;
+  sku?: string;
+  price: number;
+  compare_price?: number;
+  cost?: number;
+  stock: number;
+  low_stock_threshold?: number;
+  is_active?: boolean;
+}
+
+export async function bulkImportProductsAction(
+  items: BulkProductInput[]
+): Promise<{ success: boolean; count: number; error?: string; createdProducts?: Product[] }> {
+  try {
+    if (!items || items.length === 0) {
+      return { success: true, count: 0, createdProducts: [] };
+    }
+
+    const supabase = createAdminClient();
+    const createdList: Product[] = [];
+    const subcategoryMap: Record<string, string> = {};
+
+    const defaultPlaceholderImage =
+      "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80";
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const baseSlug = (item.name || "producto")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "");
+      const slug = `${baseSlug}-${Date.now().toString(36)}-${i}`;
+      const sku = item.sku || `ALY-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const payload = {
+        category_id: item.category_id,
+        name: item.name,
+        slug,
+        description: item.description || "",
+        detail: item.detail || "",
+        brand: item.brand || null,
+        sku,
+        price: Number(item.price) || 0,
+        compare_price: item.compare_price ? Number(item.compare_price) : null,
+        cost: item.cost ? Number(item.cost) : null,
+        stock: Number(item.stock) || 0,
+        low_stock_threshold: item.low_stock_threshold || 3,
+        is_active: item.is_active ?? true,
+        is_featured: false,
+      };
+
+      let finalId = `prod-import-${Date.now()}-${i}`;
+
+      if (supabase) {
+        const { data: inserted, error } = await supabase
+          .from("products")
+          .insert(payload)
+          .select()
+          .single();
+        if (error) {
+          console.error("Error inserting imported product:", error);
+          continue;
+        }
+        finalId = inserted.id;
+
+        // Insert placeholder image so it renders cleanly in catalog
+        await supabase.from("product_images").insert({
+          product_id: finalId,
+          url: defaultPlaceholderImage,
+          sort_order: 1,
+          is_primary: true,
+        });
+      }
+
+      if (item.subcategory) {
+        subcategoryMap[finalId] = item.subcategory;
+      }
+
+      const fullProduct: Product = {
+        id: finalId,
+        category_id: item.category_id,
+        subcategory: item.subcategory,
+        name: item.name,
+        slug,
+        description: item.description || "",
+        detail: item.detail || "",
+        brand: item.brand,
+        sku,
+        price: Number(item.price) || 0,
+        compare_price: item.compare_price ? Number(item.compare_price) : undefined,
+        cost: item.cost ? Number(item.cost) : undefined,
+        stock: Number(item.stock) || 0,
+        low_stock_threshold: item.low_stock_threshold || 3,
+        is_active: item.is_active ?? true,
+        is_featured: false,
+        rating_avg: 5.0,
+        rating_count: 0,
+        images: [
+          {
+            id: `img-${finalId}`,
+            url: defaultPlaceholderImage,
+            sort_order: 1,
+            is_primary: true,
+          },
+        ],
+        created_at: new Date().toISOString(),
+      };
+
+      createdList.push(fullProduct);
+      adminProductsStore.unshift(fullProduct);
+    }
+
+    // Save subcategories if any
+    if (supabase && Object.keys(subcategoryMap).length > 0) {
+      const subConfig = await getSubcategoriesConfig(supabase);
+      Object.assign(subConfig.products, subcategoryMap);
+      await supabase.from("settings").upsert({
+        key: "subcategories_config",
+        value: subConfig,
+      });
+    }
+
+    revalidatePath("/admin/productos");
+    revalidatePath("/admin");
+    revalidatePath("/categoria/[slug]", "page");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      count: createdList.length,
+      createdProducts: createdList,
+    };
+  } catch (err: any) {
+    console.error("Error in bulkImportProductsAction:", err);
+    return { success: false, count: 0, error: err.message || "Error al importar productos" };
+  }
+}
+
+
