@@ -34,6 +34,7 @@ import {
   updateOrderDetailsAction,
   updateFullOrderAction,
   deleteOrderAction,
+  createManualOrderAction,
 } from "@/app/actions/orders";
 
 interface OrdersViewProps {
@@ -82,6 +83,22 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
   // Delete Order Confirmation Modal State (CRUD)
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+
+  // Create Manual Order Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createCustomerName, setCreateCustomerName] = useState("");
+  const [createCustomerPhone, setCreateCustomerPhone] = useState("");
+  const [createCity, setCreateCity] = useState("Bogotá");
+  const [createNeighborhood, setCreateNeighborhood] = useState("");
+  const [createAddress, setCreateAddress] = useState("");
+  const [createDeliveryMethod, setCreateDeliveryMethod] = useState<"envio" | "recoger">("envio");
+  const [createNotes, setCreateNotes] = useState("");
+  const [createInternalNotes, setCreateInternalNotes] = useState("");
+  const [createStatus, setCreateStatus] = useState<OrderStatus>("confirmado");
+  const [createShippingCost, setCreateShippingCost] = useState<number>(0);
+  const [createItems, setCreateItems] = useState<EditableItem[]>([]);
+  const [createSelectedProdToAdd, setCreateSelectedProdToAdd] = useState<string>("");
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -274,6 +291,117 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
     }
   };
 
+  // Manual Order Creation Handlers
+  const handleOpenCreateOrder = () => {
+    setCreateCustomerName("");
+    setCreateCustomerPhone("");
+    setCreateCity("Bogotá");
+    setCreateNeighborhood("");
+    setCreateAddress("");
+    setCreateDeliveryMethod("envio");
+    setCreateNotes("");
+    setCreateInternalNotes("Pedido manual registrado desde panel administrativo");
+    setCreateStatus("confirmado");
+    setCreateShippingCost(0);
+    setCreateItems([]);
+    setCreateSelectedProdToAdd("");
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateQtyChange = (index: number, delta: number) => {
+    setCreateItems((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const newQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: newQty, subtotal: item.unit_price * newQty };
+      })
+    );
+  };
+
+  const handleCreateItemRemove = (index: number) => {
+    setCreateItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleCreateAddItemFromCatalog = () => {
+    if (!createSelectedProdToAdd) return;
+    const prod = products.find((p) => p.id === createSelectedProdToAdd);
+    if (!prod) return;
+
+    const existingIndex = createItems.findIndex((i) => i.product_id === prod.id);
+    if (existingIndex >= 0) {
+      handleCreateQtyChange(existingIndex, 1);
+    } else {
+      const primaryUrl = prod.images?.[0]?.url || "";
+      setCreateItems((prev) => [
+        ...prev,
+        {
+          id: `item-${Date.now()}`,
+          product_id: prod.id,
+          product_name: prod.name,
+          unit_price: prod.price,
+          quantity: 1,
+          subtotal: prod.price,
+          image_url: primaryUrl,
+        },
+      ]);
+    }
+    setCreateSelectedProdToAdd("");
+  };
+
+  const createSubtotal = createItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
+  const createTotal = createSubtotal + (Number(createShippingCost) || 0);
+
+  const handleSaveCreateOrder = async () => {
+    if (!createCustomerName.trim() || !createCustomerPhone.trim()) {
+      showToast("El nombre y el celular del cliente son requeridos", "error");
+      return;
+    }
+    if (createItems.length === 0) {
+      showToast("Debes agregar al menos un producto al pedido", "error");
+      return;
+    }
+
+    try {
+      setIsCreatingOrder(true);
+      const res = await createManualOrderAction({
+        customer_name: createCustomerName.trim(),
+        customer_phone: createCustomerPhone.trim(),
+        city: createCity.trim() || "Bogotá",
+        neighborhood: createNeighborhood.trim(),
+        address:
+          createAddress.trim() ||
+          (createDeliveryMethod === "recoger" ? "Recogida en punto físico / Bogotá" : "Por coordinar"),
+        delivery_method: createDeliveryMethod,
+        notes: createNotes.trim(),
+        internal_notes: createInternalNotes.trim(),
+        status: createStatus,
+        shipping_cost: Number(createShippingCost) || 0,
+        items: createItems.map((item) => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          unit_price: item.unit_price,
+          quantity: item.quantity,
+          subtotal: item.unit_price * item.quantity,
+          image_url: item.image_url,
+        })),
+      });
+
+      if (res.success && res.order) {
+        showToast(`¡Pedido ${res.order.code} creado exitosamente!`);
+        const newOrder = res.order;
+        setOrders((prev) => [newOrder, ...prev]);
+        setIsCreateModalOpen(false);
+        handleOpenDetail(newOrder);
+      } else {
+        showToast(res.error || "Error al crear el pedido", "error");
+      }
+    } catch {
+      showToast("Error inesperado al crear el pedido", "error");
+    } finally {
+      setIsCreatingOrder(false);
+    }
+  };
+
   const handleChangeStatus = async (newStatus: OrderStatus) => {
     if (!selectedOrder) return;
     try {
@@ -398,11 +526,21 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
             Gestión y CRUD de Pedidos
           </h1>
           <p className="text-xs sm:text-sm text-[#7A7590]">
-            Administra, ajusta datos del cliente, modifica o elimina productos solicitados y gestiona entregas.
+            Administra, ajusta datos del cliente, modifica o elimina productos solicitados y crea pedidos manuales.
           </p>
         </div>
-        <div className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-[#6D4BB8] self-start sm:self-auto">
-          Total pedidos: <strong>{orders.length}</strong>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="text-xs font-semibold px-3 py-2 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-[#6D4BB8]">
+            Total pedidos: <strong>{orders.length}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenCreateOrder}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-[#F472A8]" />
+            <span>Crear Pedido Manual</span>
+          </button>
         </div>
       </div>
 
@@ -1212,6 +1350,367 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                   <>
                     <Trash2 className="w-4 h-4" />
                     <span>Sí, Eliminar Pedido</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL: CREAR NUEVO PEDIDO MANUAL */}
+      {/* ================================================================= */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-2xs"
+            onClick={() => !isCreatingOrder && setIsCreateModalOpen(false)}
+          />
+
+          <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl max-h-[92vh] flex flex-col z-10 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-[#F0E8F2] flex items-center justify-between bg-gradient-to-r from-[#FAF5FB] to-white sticky top-0 z-20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#6D4BB8]/10 text-[#6D4BB8] flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-[#6D4BB8]" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-extrabold text-[#2E2A3B]">
+                    Crear Nuevo Pedido Manual
+                  </h2>
+                  <p className="text-xs text-[#7A7590]">
+                    Registra pedidos de WhatsApp, teléfono, presencial o redes con cálculo automático.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isCreatingOrder}
+                onClick={() => setIsCreateModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-[#7A7590] hover:text-[#2E2A3B] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-6">
+              {/* Sección 1: Información del Cliente y Entrega */}
+              <div className="space-y-3">
+                <h3 className="font-extrabold text-[#6D4BB8] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" />
+                  <span>1. Datos del Cliente y Despacho</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Nombre Completo *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={createCustomerName}
+                      onChange={(e) => setCreateCustomerName(e.target.value)}
+                      placeholder="Ej: Laura Sofía Martínez"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Celular / WhatsApp *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={createCustomerPhone}
+                      onChange={(e) => setCreateCustomerPhone(e.target.value)}
+                      placeholder="Ej: 3001234567"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Ciudad
+                    </label>
+                    <input
+                      type="text"
+                      value={createCity}
+                      onChange={(e) => setCreateCity(e.target.value)}
+                      placeholder="Bogotá"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Barrio / Sector
+                    </label>
+                    <input
+                      type="text"
+                      value={createNeighborhood}
+                      onChange={(e) => setCreateNeighborhood(e.target.value)}
+                      placeholder="Ej: Chapinero, Usaquén, Suba..."
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Dirección de Entrega
+                    </label>
+                    <input
+                      type="text"
+                      value={createAddress}
+                      onChange={(e) => setCreateAddress(e.target.value)}
+                      placeholder={createDeliveryMethod === "recoger" ? "Recogida presencial en tienda" : "Ej: Calle 140 # 11-45 Apto 302"}
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Método de Entrega
+                    </label>
+                    <select
+                      value={createDeliveryMethod}
+                      onChange={(e) => setCreateDeliveryMethod(e.target.value as "envio" | "recoger")}
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
+                    >
+                      <option value="envio">Envío a Domicilio</option>
+                      <option value="recoger">Recoger en Tienda / Punto Físico</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Estado Inicial
+                    </label>
+                    <select
+                      value={createStatus}
+                      onChange={(e) => setCreateStatus(e.target.value as OrderStatus)}
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
+                    >
+                      <option value="confirmado">Confirmado (Descuenta Stock)</option>
+                      <option value="pendiente">Pendiente de Pago</option>
+                      <option value="enviado">Enviado</option>
+                      <option value="entregado">Entregado</option>
+                      <option value="cancelado">Cancelado</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 2: Productos del Pedido */}
+              <div className="space-y-3 pt-4 border-t border-[#F0E8F2]">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-[#6D4BB8] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5" />
+                    <span>2. Productos del Catálogo ({createItems.length})</span>
+                  </h3>
+                </div>
+
+                {/* Selector para agregar producto */}
+                <div className="p-3 bg-[#FAF5FB] rounded-2xl border border-[#F0E8F2] flex flex-col sm:flex-row gap-2 items-center">
+                  <div className="w-full sm:flex-1">
+                    <select
+                      value={createSelectedProdToAdd}
+                      onChange={(e) => setCreateSelectedProdToAdd(e.target.value)}
+                      className="w-full p-2 rounded-xl bg-white border border-[#F0E8F2] text-xs font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    >
+                      <option value="">-- Seleccionar producto para agregar --</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — {formatCOP(p.price)} (Stock: {p.stock})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!createSelectedProdToAdd}
+                    onClick={handleCreateAddItemFromCatalog}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar</span>
+                  </button>
+                </div>
+
+                {/* Lista de productos agregados */}
+                <div className="border border-[#F0E8F2] rounded-2xl overflow-hidden divide-y divide-[#F0E8F2]">
+                  {createItems.map((item, idx) => (
+                    <div
+                      key={item.id || idx}
+                      className="p-3 flex items-center justify-between gap-3 bg-white hover:bg-[#FAF5FB] transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.product_name}
+                            className="w-10 h-10 rounded-xl object-cover border border-[#F0E8F2] shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] flex items-center justify-center text-[#7A7590] shrink-0">
+                            <ShoppingBag className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-bold text-xs text-[#2E2A3B] truncate">
+                            {item.product_name}
+                          </p>
+                          <p className="text-[11px] text-[#7A7590]">
+                            {formatCOP(item.unit_price)} c/u
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Controles de Cantidad */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-[#FAF5FB] border border-[#F0E8F2] rounded-xl overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => handleCreateQtyChange(idx, -1)}
+                            className="px-2 py-1 hover:bg-[#F0E8F2] text-[#2E2A3B] transition-colors cursor-pointer"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="px-2 text-xs font-extrabold text-[#2E2A3B] min-w-[24px] text-center">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCreateQtyChange(idx, 1)}
+                            className="px-2 py-1 hover:bg-[#F0E8F2] text-[#2E2A3B] transition-colors cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        <span className="font-extrabold text-xs text-[#6D4BB8] min-w-[80px] text-right">
+                          {formatCOP(item.unit_price * item.quantity)}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCreateItemRemove(idx)}
+                          title="Eliminar producto"
+                          className="w-8 h-8 rounded-xl hover:bg-rose-50 text-rose-500 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {createItems.length === 0 && (
+                    <div className="p-6 text-center text-[#7A7590]">
+                      <AlertTriangle className="w-6 h-6 text-amber-500 mx-auto mb-1" />
+                      <p className="font-semibold text-xs text-rose-500">
+                        No has seleccionado productos. Elige un producto arriba y haz clic en &quot;Agregar&quot;.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sección 3: Envío, Notas y Resumen Financiero */}
+              <div className="space-y-4 pt-4 border-t border-[#F0E8F2]">
+                <h3 className="font-extrabold text-[#6D4BB8] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>3. Envío, Notas y Totales</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Costo de Envío (COP)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={createShippingCost}
+                      onChange={(e) => setCreateShippingCost(Number(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-extrabold text-[#2E2A3B] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Notas del Cliente
+                    </label>
+                    <input
+                      type="text"
+                      value={createNotes}
+                      onChange={(e) => setCreateNotes(e.target.value)}
+                      placeholder="Ej: Tocar timbre 302, dejar en portería"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Notas Internas Administrativas
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={createInternalNotes}
+                      onChange={(e) => setCreateInternalNotes(e.target.value)}
+                      placeholder="Ej: Tomado por WhatsApp por la administradora. Pago por Nequi verificado."
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+                </div>
+
+                {/* Recuadro de Totales */}
+                <div className="p-4 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] space-y-1.5 text-xs">
+                  <div className="flex justify-between text-[#7A7590]">
+                    <span>Subtotal de productos ({createItems.reduce((a, b) => a + b.quantity, 0)} artículos):</span>
+                    <span className="font-bold text-[#2E2A3B]">{formatCOP(createSubtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-[#7A7590]">
+                    <span>Costo de envío:</span>
+                    <span className="font-bold text-[#2E2A3B]">{formatCOP(Number(createShippingCost) || 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-extrabold pt-2 border-t border-[#F0E8F2]">
+                    <span className="text-[#2E2A3B]">Total a Cobrar:</span>
+                    <span className="text-[#6D4BB8] text-base">{formatCOP(createTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="p-4 border-t border-[#F0E8F2] bg-[#FAF5FB] flex items-center justify-end gap-3 sticky bottom-0 z-20">
+              <button
+                type="button"
+                disabled={isCreatingOrder}
+                onClick={() => setIsCreateModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-[#F0E8F2] text-xs font-bold text-[#7A7590] hover:bg-white transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={isCreatingOrder || createItems.length === 0 || !createCustomerName.trim()}
+                onClick={handleSaveCreateOrder}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isCreatingOrder ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creando pedido...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Crear Pedido y Generar ALY</span>
                   </>
                 )}
               </button>

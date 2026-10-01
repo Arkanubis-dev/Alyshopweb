@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Order, OrderStatus, UpdateOrderInput } from "@/types";
-import { fallbackOrders, removeFallbackOrder } from "@/lib/orders-cache";
+import { fallbackOrders, removeFallbackOrder, saveFallbackOrder } from "@/lib/orders-cache";
 import { updateProductStockAction } from "./inventory";
 import { getAllAdminProducts } from "./products";
 
@@ -340,4 +341,192 @@ export async function deleteOrderAction(
     return { success: false, error: err.message || "Error al eliminar el pedido" };
   }
 }
+
+export interface CreateManualOrderItemInput {
+  product_id?: string;
+  product_name: string;
+  unit_price: number;
+  quantity: number;
+  image_url?: string;
+}
+
+export interface CreateManualOrderInput {
+  customer_name: string;
+  customer_phone: string;
+  city: string;
+  neighborhood: string;
+  address: string;
+  delivery_method: "envio" | "recoger";
+  notes?: string;
+  internal_notes?: string;
+  status: OrderStatus;
+  shipping_cost: number;
+  items: CreateManualOrderItemInput[];
+}
+
+export async function createManualOrderAction(
+  input: CreateManualOrderInput
+): Promise<{ success: boolean; error?: string; order?: Order }> {
+  try {
+    if (!input.customer_name?.trim() || !input.customer_phone?.trim()) {
+      return { success: false, error: "Nombre y celular del cliente son requeridos" };
+    }
+    if (!input.items || input.items.length === 0) {
+      return { success: false, error: "Debes incluir al menos un producto en el pedido" };
+    }
+
+    const supabase = createAdminClient();
+
+    // 1. Calculate items & subtotals
+    const processedItems = input.items.map((i, idx) => {
+      const qty = Math.max(1, Number(i.quantity) || 1);
+      const price = Math.max(0, Number(i.unit_price) || 0);
+      return {
+        id: `item-${Date.now()}-${idx}`,
+        product_id: i.product_id,
+        product_name: i.product_name,
+        unit_price: price,
+        quantity: qty,
+        subtotal: price * qty,
+        image_url: i.image_url,
+      };
+    });
+
+    const subtotal = processedItems.reduce((acc, i) => acc + i.subtotal, 0);
+    const shippingCost = Math.max(0, Number(input.shipping_cost) || 0);
+    const total = subtotal + shippingCost;
+
+    // 2. Generate next consecutive code (ALY-0001, ALY-0002...)
+    let nextCode = "ALY-0001";
+    if (supabase) {
+      const { data: latest } = await supabase
+        .from("orders")
+        .select("code")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (latest && latest.length > 0 && latest[0]?.code) {
+        const match = latest[0].code.match(/ALY-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10) + 1;
+          nextCode = `ALY-${String(num).padStart(4, "0")}`;
+        }
+      }
+    } else {
+      const orders = Array.from(fallbackOrders.values());
+      if (orders.length > 0) {
+        const nums = orders
+          .map((o) => {
+            const m = o.code.match(/ALY-(\d+)/);
+            return m ? parseInt(m[1], 10) : 0;
+          })
+          .filter(Boolean);
+        const max = nums.length > 0 ? Math.max(...nums) : 0;
+        nextCode = `ALY-${String(max + 1).padStart(4, "0")}`;
+      }
+    }
+
+    const publicToken = crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, "")
+      : Math.random().toString(36).substring(2) + Date.now().toString(36);
+    let finalId = `order-${Date.now()}`;
+
+    // 3. Insert into Supabase
+    if (supabase) {
+      const orderPayload = {
+        code: nextCode,
+        public_token: publicToken,
+        customer_name: input.customer_name.trim(),
+        customer_phone: input.customer_phone.trim(),
+        city: input.city.trim() || "Bogotá",
+        neighborhood: input.neighborhood.trim() || "General",
+        address: input.address.trim() || "Entrega acordada",
+        delivery_method: input.delivery_method || "envio",
+        notes: input.notes?.trim() || null,
+        internal_notes: input.internal_notes?.trim() || "Pedido manual creado desde panel administrativo",
+        status: input.status || "pendiente",
+        subtotal,
+        shipping_cost: shippingCost,
+        total,
+      };
+
+      const { data: insertedOrder, error: orderError } = await supabase
+        .from("orders")
+        .insert(orderPayload)
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+      finalId = insertedOrder.id;
+
+      // Insert order items
+      const itemsPayload = processedItems.map((item) => ({
+        order_id: finalId,
+        product_id: item.product_id || null,
+        product_name: item.product_name,
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+        subtotal: item.subtotal,
+        image_url: item.image_url || null,
+      }));
+
+      const { error: itemsError } = await supabase.from("order_items").insert(itemsPayload);
+      if (itemsError) {
+        console.error("Error inserting manual order items:", itemsError);
+      }
+    }
+
+    // 4. If status is 'confirmado', discount stock from inventory
+    if (input.status === "confirmado") {
+      const allProducts = await getAllAdminProducts();
+      for (const item of processedItems) {
+        if (item.product_id) {
+          const product = allProducts.find((p) => p.id === item.product_id);
+          if (product) {
+            const nextStock = Math.max(0, product.stock - item.quantity);
+            await updateProductStockAction(
+              product.id,
+              nextStock,
+              `Venta pedido manual ${nextCode}`,
+              "salida"
+            );
+          }
+        }
+      }
+    }
+
+    const createdOrder: Order = {
+      id: finalId,
+      code: nextCode,
+      public_token: publicToken,
+      customer_name: input.customer_name.trim(),
+      customer_phone: input.customer_phone.trim(),
+      city: input.city.trim() || "Bogotá",
+      neighborhood: input.neighborhood.trim() || "General",
+      address: input.address.trim() || "Entrega acordada",
+      delivery_method: input.delivery_method || "envio",
+      notes: input.notes?.trim() || undefined,
+      internal_notes: input.internal_notes?.trim() || "Pedido manual creado desde panel administrativo",
+      status: input.status || "pendiente",
+      subtotal,
+      shipping_cost: shippingCost,
+      total,
+      created_at: new Date().toISOString(),
+      order_items: processedItems.map((i) => ({ ...i, order_id: finalId })),
+    };
+
+    saveFallbackOrder(createdOrder);
+
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin");
+    revalidatePath(`/pedido/${nextCode}`);
+    revalidatePath("/");
+
+    return { success: true, order: createdOrder };
+  } catch (err: any) {
+    console.error("Error in createManualOrderAction:", err);
+    return { success: false, error: err.message || "Error al crear el pedido manual" };
+  }
+}
+
 
