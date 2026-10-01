@@ -67,13 +67,17 @@ export function CategorySidebar({ categories, activeSlug }: CategorySidebarProps
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors overflow-hidden ${
                         isActive
                           ? "bg-[#6D4BB8] text-white"
                           : "bg-[#FCE4EF]/70 text-[#6D4BB8] group-hover:bg-[#6D4BB8] group-hover:text-white"
                       }`}
                     >
-                      <IconComponent className="w-3.5 h-3.5" strokeWidth={1.5} />
+                      {cat.image_url ? (
+                        <img src={cat.image_url} alt={cat.name} className="w-4 h-4 object-contain" />
+                      ) : (
+                        <IconComponent className="w-3.5 h-3.5" strokeWidth={1.5} />
+                      )}
                     </div>
                     <span className="truncate">{cat.name}</span>
                   </div>

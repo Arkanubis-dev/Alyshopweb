@@ -13,6 +13,8 @@ export async function Footer() {
   const cleanPhone = rawWhatsapp.replace(/\D/g, "");
 
   const cityName = settings.store_info?.city || "Bogotá";
+  const logoUrl = settings.store_info?.logo_url || "";
+  const storeName = settings.store_info?.name || "alyshop";
 
   const instagramUrl =
     settings.social?.instagram ||
@@ -37,7 +39,7 @@ export async function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 pb-10 border-b border-[#F5EDF7]">
           {/* Brand info */}
           <div className="space-y-4">
-            <Logo size="md" />
+            <Logo size="md" logoUrl={logoUrl} storeName={storeName} />
             <p className="text-xs sm:text-sm text-[#7A7590] leading-relaxed">
               Tu tienda online de confianza en Colombia. Te traemos artículos únicos,
               útiles y de la mejor calidad para tu hogar, familia y bienestar.

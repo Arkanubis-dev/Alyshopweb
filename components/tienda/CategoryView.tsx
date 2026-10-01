@@ -84,12 +84,21 @@ export function CategoryView({
               <Sparkles className="w-3 h-3 text-[#F472A8]" />
               <span>Catálogo alyshop</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2E2A3B] tracking-tight">
-              {categoryName}
-            </h1>
-            <p className="text-xs sm:text-sm text-[#7A7590] mt-1">
-              Explora nuestra selección especial de artículos útiles y bonitos.
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+              {category?.image_url && (
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/90 border border-white/80 p-2 flex items-center justify-center shadow-xs shrink-0">
+                  <img src={category.image_url} alt={categoryName} className="w-full h-full object-contain" />
+                </div>
+              )}
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2E2A3B] tracking-tight">
+                  {categoryName}
+                </h1>
+                <p className="text-xs sm:text-sm text-[#7A7590] mt-0.5">
+                  Explora nuestra selección especial de artículos útiles y bonitos.
+                </p>
+              </div>
+            </div>
           </div>
           <div className="shrink-0 bg-white/80 backdrop-blur-xs px-4 py-2 rounded-xl border border-white/70 shadow-2xs text-center self-start sm:self-center">
             <span className="text-xl font-bold text-[#6D4BB8]">

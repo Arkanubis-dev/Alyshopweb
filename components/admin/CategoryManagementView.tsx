@@ -27,6 +27,8 @@ import {
   GripVertical,
   ChevronUp,
   ChevronDown,
+  Upload,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Category, Product } from "@/types";
 import {
@@ -35,6 +37,7 @@ import {
   toggleCategoryStatusAction,
   reorderCategoriesAction,
 } from "@/app/actions/categories";
+import { uploadProductImageAction } from "@/app/actions/products";
 
 import { PerfumeIcon } from "@/components/tienda/PerfumeIcon";
 
@@ -77,7 +80,32 @@ export function CategoryManagementView({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [categoryIconTab, setCategoryIconTab] = useState<"icon" | "png">("icon");
+  const [isUploadingCategoryIcon, setIsUploadingCategoryIcon] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handleUploadCategoryIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingCategoryIcon(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadProductImageAction(formData);
+      if (res.success && res.url) {
+        setEditingCategory((prev) => (prev ? { ...prev, image_url: res.url } : null));
+        setCategoryIconTab("png");
+        showToast("Logo PNG de categoría subido correctamente");
+      } else {
+        showToast(res.error || "Error al subir la imagen", "error");
+      }
+    } catch {
+      showToast("Error inesperado al subir imagen", "error");
+    } finally {
+      setIsUploadingCategoryIcon(false);
+    }
+  };
 
   // Delete modal with move products support
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
@@ -208,7 +236,9 @@ export function CategoryManagementView({
       sort_order: categories.length + 1,
       is_active: true,
       subcategories: [],
+      image_url: undefined,
     });
+    setCategoryIconTab("icon");
     setNewSubcategoryInput("");
     setIsDrawerOpen(true);
   };
@@ -218,6 +248,7 @@ export function CategoryManagementView({
       ...category,
       subcategories: category.subcategories || [],
     });
+    setCategoryIconTab(category.image_url ? "png" : "icon");
     setNewSubcategoryInput("");
     setIsDrawerOpen(true);
   };
@@ -457,10 +488,18 @@ export function CategoryManagementView({
                     {/* Icon & Color Badge */}
                     <td className="py-3 px-4">
                       <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center border border-black/5 shadow-2xs"
+                        className="w-10 h-10 rounded-xl flex items-center justify-center border border-black/5 shadow-2xs overflow-hidden"
                         style={{ backgroundColor: cat.color }}
                       >
-                        <IconComponent className="w-5 h-5 text-[#6D4BB8]" strokeWidth={1.6} />
+                        {cat.image_url ? (
+                          <img
+                            src={cat.image_url}
+                            alt={cat.name}
+                            className="w-6 h-6 object-contain"
+                          />
+                        ) : (
+                          <IconComponent className="w-5 h-5 text-[#6D4BB8]" strokeWidth={1.6} />
+                        )}
                       </div>
                     </td>
 
@@ -595,32 +634,145 @@ export function CategoryManagementView({
                   />
                 </div>
 
-                {/* Icon Selector */}
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-[#2E2A3B]">
-                    Ícono Lineal (Lucide)
-                  </label>
-                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                    {AVAILABLE_ICONS.map((i) => {
-                      const IconComp = i.component;
-                      const isSelected = editingCategory.icon === i.name;
-                      return (
-                        <button
-                          key={i.name}
-                          type="button"
-                          onClick={() => setEditingCategory({ ...editingCategory, icon: i.name })}
-                          className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all ${
-                            isSelected
-                              ? "border-[#6D4BB8] bg-[#EEEAFB] text-[#6D4BB8] shadow-xs"
-                              : "border-[#F0E8F2] hover:bg-gray-50 text-[#7A7590]"
-                          }`}
-                        >
-                          <IconComp className="w-5 h-5" strokeWidth={1.5} />
-                          <span className="text-[10px] truncate max-w-full">{i.label}</span>
-                        </button>
-                      );
-                    })}
+                {/* Selector de Ícono o Imagen PNG Personalizada */}
+                <div className="space-y-3 p-3.5 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#2E2A3B]">
+                      Logo o Ícono de la Categoría
+                    </label>
+                    <div className="flex items-center bg-white rounded-xl p-0.5 border border-[#F0E8F2] text-[11px] font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setCategoryIconTab("icon")}
+                        className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                          categoryIconTab === "icon"
+                            ? "bg-[#6D4BB8] text-white shadow-xs"
+                            : "text-[#7A7590] hover:text-[#2E2A3B]"
+                        }`}
+                      >
+                        Ícono Lucide
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCategoryIconTab("png")}
+                        className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                          categoryIconTab === "png"
+                            ? "bg-[#6D4BB8] text-white shadow-xs"
+                            : "text-[#7A7590] hover:text-[#2E2A3B]"
+                        }`}
+                      >
+                        Subir PNG / Imagen
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Vista Previa del Ícono con su Color de Fondo */}
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-[#F0E8F2]">
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center border border-black/5 shadow-2xs overflow-hidden shrink-0"
+                      style={{ backgroundColor: editingCategory.color || "#FCE4EF" }}
+                    >
+                      {editingCategory.image_url ? (
+                        <img
+                          src={editingCategory.image_url}
+                          alt="Previa logo categoría"
+                          className="w-8 h-8 object-contain"
+                        />
+                      ) : (
+                        (() => {
+                          const IconComp = (AVAILABLE_ICONS.find((i) => i.name === editingCategory.icon) || AVAILABLE_ICONS[0]).component;
+                          return <IconComp className="w-6 h-6 text-[#6D4BB8]" strokeWidth={1.5} />;
+                        })()
+                      )}
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-bold text-[#2E2A3B]">
+                        {editingCategory.image_url ? "Logo PNG personalizado activo" : `Ícono lineal: ${editingCategory.icon || "Grid"}`}
+                      </p>
+                      <p className="text-[11px] text-[#7A7590]">
+                        Se muestra con el color de fondo elegido
+                      </p>
+                    </div>
+                    {editingCategory.image_url && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingCategory({ ...editingCategory, image_url: undefined })}
+                        className="ml-auto text-xs text-rose-500 hover:text-rose-700 font-semibold px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                      >
+                        Quitar PNG
+                      </button>
+                    )}
+                  </div>
+
+                  {categoryIconTab === "icon" ? (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] text-[#7A7590]">Elige un ícono de la librería:</p>
+                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-44 overflow-y-auto pr-1">
+                        {AVAILABLE_ICONS.map((i) => {
+                          const IconComp = i.component;
+                          const isSelected = editingCategory.icon === i.name && !editingCategory.image_url;
+                          return (
+                            <button
+                              key={i.name}
+                              type="button"
+                              onClick={() => setEditingCategory({ ...editingCategory, icon: i.name, image_url: undefined })}
+                              className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-[#6D4BB8] bg-[#EEEAFB] text-[#6D4BB8] shadow-xs"
+                                  : "border-[#F0E8F2] bg-white hover:bg-gray-50 text-[#7A7590]"
+                              }`}
+                            >
+                              <IconComp className="w-5 h-5" strokeWidth={1.5} />
+                              <span className="text-[10px] truncate max-w-full">{i.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 bg-white p-3.5 rounded-xl border border-[#F0E8F2]">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-[#7A7590] uppercase block">
+                          Subir Archivo PNG / SVG
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[#F0E8F2] hover:border-[#6D4BB8] rounded-xl bg-[#FAF5FB] hover:bg-[#EEEAFB]/30 transition-colors">
+                            {isUploadingCategoryIcon ? (
+                              <Loader2 className="w-4 h-4 text-[#6D4BB8] animate-spin" />
+                            ) : (
+                              <Upload className="w-4 h-4 text-[#6D4BB8]" />
+                            )}
+                            <span className="text-xs font-semibold text-[#6D4BB8]">
+                              {isUploadingCategoryIcon ? "Subiendo imagen PNG..." : "Seleccionar imagen PNG desde tu equipo"}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/png,image/svg+xml,image/webp,image/jpeg"
+                              disabled={isUploadingCategoryIcon}
+                              onChange={handleUploadCategoryIcon}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                        <p className="text-[10px] text-[#7A7590] mt-1">
+                          Recomendado: archivo PNG con fondo transparente, dimensiones cuadradas (128x128 o 256x256 px).
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-[#7A7590] uppercase block">
+                          O ingresa la URL directa de la imagen
+                        </label>
+                        <input
+                          type="url"
+                          value={editingCategory.image_url || ""}
+                          onChange={(e) => setEditingCategory({ ...editingCategory, image_url: e.target.value })}
+                          placeholder="https://ejemplo.com/icono-perfume.png"
+                          className="w-full text-xs p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2]"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Color Selector */}

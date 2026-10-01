@@ -16,6 +16,12 @@ const DEFAULT_SETTINGS: StoreSettings = {
   low_stock_threshold: 3,
   footer_invoice_text:
     "Gracias por tu compra en alyshop. Resumen de pedido para gestión interna de la tienda y no constituye una factura electrónica ante la DIAN.",
+  logo_url: "",
+  color_palette: "pastel-morado",
+  primary_color: "#6D4BB8",
+  secondary_color: "#F472A8",
+  header_bg_color: "#FFFFFF",
+  text_color: "#2E2A3B",
 };
 
 const globalForSettings = global as unknown as { adminSettings: StoreSettings };
@@ -49,6 +55,12 @@ export async function getAdminSettingsAction(): Promise<StoreSettings> {
           low_stock_threshold: Number(map.store_info?.low_stock_threshold ?? 3),
           footer_invoice_text:
             map.store_info?.footer_note || DEFAULT_SETTINGS.footer_invoice_text,
+          logo_url: map.store_info?.logo_url || "",
+          color_palette: map.theme?.palette || DEFAULT_SETTINGS.color_palette,
+          primary_color: map.theme?.primary_color || DEFAULT_SETTINGS.primary_color,
+          secondary_color: map.theme?.secondary_color || DEFAULT_SETTINGS.secondary_color,
+          header_bg_color: map.theme?.header_bg_color || DEFAULT_SETTINGS.header_bg_color,
+          text_color: map.theme?.text_color || DEFAULT_SETTINGS.text_color,
         };
       }
     }
@@ -74,6 +86,17 @@ export async function saveAdminSettingsAction(
             city: newSettings.city,
             low_stock_threshold: newSettings.low_stock_threshold,
             footer_note: newSettings.footer_invoice_text,
+            logo_url: newSettings.logo_url || "",
+          },
+        },
+        {
+          key: "theme",
+          value: {
+            palette: newSettings.color_palette || "pastel-morado",
+            primary_color: newSettings.primary_color || "#6D4BB8",
+            secondary_color: newSettings.secondary_color || "#F472A8",
+            header_bg_color: newSettings.header_bg_color || "#FFFFFF",
+            text_color: newSettings.text_color || "#2E2A3B",
           },
         },
         {
@@ -102,6 +125,7 @@ export async function saveAdminSettingsAction(
     Object.assign(adminSettingsStore, newSettings);
 
     revalidatePath("/admin/ajustes");
+    revalidatePath("/", "layout");
     revalidatePath("/");
     return { success: true };
   } catch (err: any) {

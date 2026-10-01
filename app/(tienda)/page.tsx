@@ -42,8 +42,8 @@ export default async function HomePage() {
           {/* a) Banner Hero Carousel */}
           <HeroCarousel slides={bannerSlides} />
 
-          {/* b) Fila de Categorías Circulares (8 círculos) */}
-          <CategoryPills />
+          {/* b) Fila de Categorías Circulares */}
+          <CategoryPills categories={categories} />
 
           {/* c) Sección "Productos destacados" (4 columnas en desktop) */}
           <ProductGrid

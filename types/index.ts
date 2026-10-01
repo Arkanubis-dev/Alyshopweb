@@ -8,6 +8,7 @@ export interface Category {
   is_active: boolean;
   item_count?: number;
   subcategories?: string[];
+  image_url?: string; // Optional custom PNG logo/icon
 }
 
 export interface ProductImage {
@@ -140,6 +141,12 @@ export interface StoreSettings {
   default_shipping_cost: number;
   low_stock_threshold: number;
   footer_invoice_text: string;
+  logo_url?: string;
+  color_palette?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  header_bg_color?: string;
+  text_color?: string;
 }
 
 export interface BannerSlide {

@@ -9,7 +9,13 @@ import { MobileCategoryDrawer } from "./MobileCategoryDrawer";
 import { useCartStore } from "@/store/useCartStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
 
-export function Header() {
+interface HeaderProps {
+  logoUrl?: string;
+  storeName?: string;
+  headerBg?: string;
+}
+
+export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
 
@@ -21,7 +27,10 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-[#FFFBF7]/95 backdrop-blur-md border-b border-[#F0E8F2] shadow-xs transition-all">
+      <header
+        className="sticky top-0 z-40 backdrop-blur-md border-b border-[#F0E8F2] shadow-xs transition-all"
+        style={{ backgroundColor: headerBg ? `${headerBg}F5` : "rgba(255, 251, 247, 0.95)" }}
+      >
         {/* Main Header Container */}
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4 py-3 sm:py-3.5">
@@ -36,7 +45,7 @@ export function Header() {
                 <Menu className="w-6 h-6" strokeWidth={1.8} />
               </button>
 
-              <Logo />
+              <Logo logoUrl={logoUrl} storeName={storeName} />
             </div>
 
             {/* Desktop Search Bar */}
@@ -134,6 +143,8 @@ export function Header() {
       <MobileCategoryDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
+        logoUrl={logoUrl}
+        storeName={storeName}
       />
     </>
   );

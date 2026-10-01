@@ -35,6 +35,21 @@ export async function getSubcategoriesConfig(supabaseClient?: any): Promise<{
   }
 }
 
+export async function getCategoryIconsConfig(supabaseClient?: any): Promise<Record<string, string>> {
+  try {
+    const supabase = supabaseClient || createAdminClient();
+    if (!supabase) return {};
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "category_icons_config")
+      .single();
+    return data?.value?.icons || {};
+  } catch {
+    return {};
+  }
+}
+
 export async function getAllAdminCategories(): Promise<Category[]> {
   try {
     const supabase = createAdminClient();
@@ -45,7 +60,11 @@ export async function getAllAdminCategories(): Promise<Category[]> {
         .order("sort_order", { ascending: true });
 
       if (!error && data && data.length > 0) {
-        const subConfig = await getSubcategoriesConfig(supabase);
+        const [subConfig, iconsConfig] = await Promise.all([
+          getSubcategoriesConfig(supabase),
+          getCategoryIconsConfig(supabase),
+        ]);
+
         return data.map((item: any) => ({
           id: item.id,
           name: item.name,
@@ -55,6 +74,7 @@ export async function getAllAdminCategories(): Promise<Category[]> {
           sort_order: item.sort_order || 0,
           is_active: item.is_active,
           subcategories: subConfig.categories[item.id] || [],
+          image_url: iconsConfig[item.id] || item.image_url || undefined,
         }));
       }
     }
@@ -76,7 +96,7 @@ export async function saveCategoryAction(categoryData: Partial<Category>): Promi
 
     const supabase = createAdminClient();
     if (supabase) {
-      const payload = {
+      const payload: Record<string, any> = {
         name: categoryData.name,
         slug: categoryData.slug,
         icon: categoryData.icon || "Grid",
@@ -104,6 +124,19 @@ export async function saveCategoryAction(categoryData: Partial<Category>): Promi
           value: subConfig,
         });
       }
+
+      if (categoryData.image_url !== undefined) {
+        const iconsConfig = await getCategoryIconsConfig(supabase);
+        if (categoryData.image_url) {
+          iconsConfig[categoryId] = categoryData.image_url;
+        } else {
+          delete iconsConfig[categoryId];
+        }
+        await supabase.from("settings").upsert({
+          key: "category_icons_config",
+          value: { icons: iconsConfig },
+        });
+      }
     }
 
     const newCategory: Category = {
@@ -115,6 +148,7 @@ export async function saveCategoryAction(categoryData: Partial<Category>): Promi
       sort_order: categoryData.sort_order || 0,
       is_active: categoryData.is_active ?? true,
       subcategories: categoryData.subcategories || [],
+      image_url: categoryData.image_url || undefined,
     };
 
     const idx = adminCategoriesStore.findIndex((c) => c.id === categoryId);

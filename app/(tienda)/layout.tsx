@@ -3,15 +3,22 @@ import { BottomValueStrip } from "@/components/tienda/BottomValueStrip";
 import { Footer } from "@/components/tienda/Footer";
 import { MobileBottomNav } from "@/components/tienda/MobileBottomNav";
 import { WhatsAppFloatingButton } from "@/components/tienda/WhatsAppFloatingButton";
+import { getAdminSettingsAction } from "@/app/actions/settings";
 
-export default function TiendaLayout({
+export default async function TiendaLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const settings = await getAdminSettingsAction();
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FFFBF7]">
-      <Header />
+      <Header
+        logoUrl={settings.logo_url}
+        storeName={settings.name}
+        headerBg={settings.header_bg_color}
+      />
       <main className="flex-1">{children}</main>
       <BottomValueStrip />
       <Footer />

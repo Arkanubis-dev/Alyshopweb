@@ -27,6 +27,8 @@ import { PerfumeIcon } from "./PerfumeIcon";
 interface MobileCategoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  logoUrl?: string;
+  storeName?: string;
 }
 
 const ICON_MAP: Record<string, any> = {
@@ -44,7 +46,12 @@ const ICON_MAP: Record<string, any> = {
   Fragrance: PerfumeIcon,
 };
 
-export function MobileCategoryDrawer({ isOpen, onClose }: MobileCategoryDrawerProps) {
+export function MobileCategoryDrawer({
+  isOpen,
+  onClose,
+  logoUrl,
+  storeName,
+}: MobileCategoryDrawerProps) {
   // Lock body scroll when drawer is open
   useEffect(() => {
     if (isOpen) {
@@ -71,7 +78,7 @@ export function MobileCategoryDrawer({ isOpen, onClose }: MobileCategoryDrawerPr
       <div className="fixed inset-y-0 left-0 max-w-xs w-full bg-[#FFFBF7] shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
         {/* Drawer Header */}
         <div className="p-4 border-b border-[#F0E8F2] flex items-center justify-between bg-white">
-          <Logo size="sm" showSlogan={false} />
+          <Logo size="sm" showSlogan={false} logoUrl={logoUrl} storeName={storeName} />
           <button
             onClick={onClose}
             className="p-2 text-[#7A7590] hover:text-[#2E2A3B] hover:bg-[#FCE4EF]/50 rounded-full transition-colors"
@@ -98,8 +105,12 @@ export function MobileCategoryDrawer({ isOpen, onClose }: MobileCategoryDrawerPr
                     className="flex items-center justify-between px-3.5 py-3 hover:bg-[#EEEAFB] text-[#2E2A3B] transition-colors group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-[#FCE4EF] flex items-center justify-center text-[#6D4BB8] group-hover:bg-[#EEEAFB]">
-                        <IconComponent className="w-4 h-4" strokeWidth={1.5} />
+                      <div className="w-8 h-8 rounded-lg bg-[#FCE4EF] flex items-center justify-center text-[#6D4BB8] group-hover:bg-[#EEEAFB] overflow-hidden">
+                        {cat.image_url ? (
+                          <img src={cat.image_url} alt={cat.name} className="w-5 h-5 object-contain" />
+                        ) : (
+                          <IconComponent className="w-4 h-4" strokeWidth={1.5} />
+                        )}
                       </div>
                       <span className="text-sm font-medium group-hover:text-[#6D4BB8]">
                         {cat.name}

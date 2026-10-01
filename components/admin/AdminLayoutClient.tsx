@@ -22,6 +22,8 @@ import { logoutAdminAction } from "@/app/actions/auth";
 
 interface AdminLayoutClientProps {
   children: React.ReactNode;
+  logoUrl?: string;
+  storeName?: string;
 }
 
 const NAV_ITEMS = [
@@ -34,7 +36,11 @@ const NAV_ITEMS = [
   { name: "Ajustes", href: "/admin/ajustes", icon: Settings },
 ];
 
-export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
+export function AdminLayoutClient({
+  children,
+  logoUrl,
+  storeName,
+}: AdminLayoutClientProps) {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -47,7 +53,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
     <div className="min-h-screen bg-[#FAF7F5] flex flex-col lg:flex-row">
       {/* Mobile Header Bar */}
       <header className="lg:hidden bg-white border-b border-[#F0E8F2] px-4 py-3 flex items-center justify-between sticky top-0 z-30">
-        <Logo size="sm" showSlogan={false} />
+        <Logo size="sm" showSlogan={false} logoUrl={logoUrl} storeName={storeName} />
         <button
           type="button"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
@@ -65,7 +71,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
       >
         {/* Top brand */}
         <div className="p-5 border-b border-[#F0E8F2] space-y-2">
-          <Logo size="sm" showSlogan={false} />
+          <Logo size="sm" showSlogan={false} logoUrl={logoUrl} storeName={storeName} />
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EEEAFB] text-[10px] font-bold text-[#6D4BB8]">
             <Sparkles className="w-3 h-3 text-[#F472A8]" />
             <span>Panel de Control</span>

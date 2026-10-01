@@ -69,6 +69,19 @@ async function getSubcategoriesConfigQuery(supabase: any): Promise<{
   }
 }
 
+async function getCategoryIconsConfigQuery(supabase: any): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "category_icons_config")
+      .single();
+    return data?.value?.icons || {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Fetch all active categories from Supabase, ordered by sort_order.
  */
@@ -87,7 +100,11 @@ export async function getCategories(): Promise<Category[]> {
       return MOCK_CATEGORIES;
     }
 
-    const subConfig = await getSubcategoriesConfigQuery(supabase);
+    const [subConfig, iconsConfig] = await Promise.all([
+      getSubcategoriesConfigQuery(supabase),
+      getCategoryIconsConfigQuery(supabase),
+    ]);
+
     return data.map((item: any) => ({
       id: item.id,
       name: item.name,
@@ -97,6 +114,7 @@ export async function getCategories(): Promise<Category[]> {
       sort_order: item.sort_order || 0,
       is_active: item.is_active,
       subcategories: subConfig.categories[item.id] || [],
+      image_url: iconsConfig[item.id] || item.image_url || undefined,
     }));
   } catch (err) {
     console.error("Error fetching categories from Supabase:", err);

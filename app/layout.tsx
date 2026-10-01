@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Pacifico, Nunito } from "next/font/google";
+import { getAdminSettingsAction } from "@/app/actions/settings";
 import "./globals.css";
 
 const pacifico = Pacifico({
@@ -92,23 +93,30 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const settings = await getAdminSettingsAction();
+  const primaryColor = settings?.primary_color || "#6D4BB8";
+  const secondaryColor = settings?.secondary_color || "#F472A8";
+  const headerBgColor = settings?.header_bg_color || "#FFFFFF";
+  const textColor = settings?.text_color || "#2E2A3B";
+
   const jsonLdOrg = {
     "@context": "https://schema.org",
     "@type": "OnlineStore",
-    name: "alyshop",
+    name: settings?.name || "alyshop",
     url: baseUrl,
-    logo: `${baseUrl}/logo.png`,
+    logo: settings?.logo_url || `${baseUrl}/logo.png`,
     description:
+      settings?.slogan ||
       "Tienda online con variedad de artículos para el hogar, cocina, ropa, belleza, tecnología, juguetes, papelería y mascotas en Colombia.",
-    telephone: "+573213052913",
+    telephone: `+${settings?.whatsapp_number || "573213052913"}`,
     address: {
       "@type": "PostalAddress",
-      addressLocality: "Bogotá",
+      addressLocality: settings?.city || "Bogotá",
       addressCountry: "CO",
     },
     currenciesAccepted: "COP",
@@ -125,6 +133,20 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }}
+        />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              :root {
+                --color-primary: ${primaryColor};
+                --color-secondary: ${secondaryColor};
+                --color-header-bg: ${headerBgColor};
+                --color-site-text: ${textColor};
+                --color-aly-purple: ${primaryColor};
+                --color-aly-pink: ${secondaryColor};
+              }
+            `,
+          }}
         />
       </head>
       <body className="min-h-full flex flex-col bg-[#FFFBF7] text-[#2E2A3B] font-sans selection:bg-[#FCE4EF] selection:text-[#E85D04]">
