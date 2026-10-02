@@ -255,7 +255,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
       {/* Top Header */}
       <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-[#6D4BB8] font-bold text-xs uppercase tracking-wider mb-1">
             <Layers className="w-4 h-4" />
             <span>Escaparate & Marketing</span>
           </div>
@@ -270,7 +270,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
               className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border transition-colors ${
                 isLimitReached
                   ? "bg-amber-100 text-amber-900 border-amber-300"
-                  : "bg-primary/10 text-primary border-primary/20"
+                  : "bg-[#EEEAFB] text-[#6D4BB8] border-[#6D4BB8]/20"
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -285,15 +285,15 @@ export function BannersView({ initialBanners }: BannersViewProps) {
           onClick={handleOpenCreate}
           disabled={isLimitReached}
           title={isLimitReached ? `Límite máximo de ${MAX_BANNERS} banners alcanzado` : "Crear nuevo banner"}
-          className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 font-bold rounded-xl shadow-sm transition-all text-sm shrink-0 ${
+          className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 font-bold rounded-xl shadow-md transition-all text-sm shrink-0 ${
             isLimitReached
               ? "bg-stone-200 text-stone-400 cursor-not-allowed border border-stone-300 shadow-none"
-              : "bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer"
+              : "bg-[#6D4BB8] hover:bg-[#5837A3] text-white active:scale-95 cursor-pointer"
           }`}
         >
           <Plus className="w-4 h-4" />
           <span>Nuevo Banner</span>
-          <span className="text-xs opacity-75">({banners.length}/{MAX_BANNERS})</span>
+          <span className="text-xs opacity-80">({banners.length}/{MAX_BANNERS})</span>
         </button>
       </div>
 
@@ -441,7 +441,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
             </p>
             <button
               onClick={handleOpenCreate}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white font-bold rounded-xl text-sm"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#6D4BB8] hover:bg-[#5837A3] text-white font-bold rounded-xl text-sm shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Crear Banner</span>
@@ -540,7 +540,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                       onClick={() => setFormData({ ...formData, bg_gradient: grad.class })}
                       className={`p-2 rounded-xl border flex items-center gap-2 text-left transition-all cursor-pointer ${
                         formData.bg_gradient === grad.class
-                          ? "border-primary ring-2 ring-primary/20 bg-primary/5 shadow-2xs"
+                          ? "border-[#6D4BB8] ring-2 ring-[#6D4BB8]/20 bg-[#EEEAFB]/40 shadow-2xs"
                           : "border-stone-200 hover:border-stone-300 bg-white"
                       }`}
                     >
@@ -584,11 +584,11 @@ export function BannersView({ initialBanners }: BannersViewProps) {
 
                     {/* Acciones para cambiar o quitar */}
                     <div className="flex items-center justify-between gap-2 pt-1">
-                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-200 hover:border-primary text-xs font-bold text-stone-700 hover:text-primary bg-white hover:bg-stone-50 transition-colors shadow-2xs">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-200 hover:border-[#6D4BB8] text-xs font-bold text-stone-700 hover:text-[#6D4BB8] bg-white hover:bg-stone-50 transition-colors shadow-2xs">
                         {isUploadingImage ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#6D4BB8]" />
                         ) : (
-                          <Upload className="w-3.5 h-3.5 text-primary" />
+                          <Upload className="w-3.5 h-3.5 text-[#6D4BB8]" />
                         )}
                         <span>{isUploadingImage ? "Subiendo..." : "Cambiar imagen"}</span>
                         <input
@@ -617,8 +617,8 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                     onDrop={handleDrop}
                     className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
                       dragOver
-                        ? "border-primary bg-primary/5 scale-[1.01]"
-                        : "border-stone-300 hover:border-primary/60 bg-stone-50/70 hover:bg-primary/5"
+                        ? "border-[#6D4BB8] bg-[#EEEAFB]/30 scale-[1.01]"
+                        : "border-stone-300 hover:border-[#6D4BB8]/60 bg-stone-50/70 hover:bg-[#EEEAFB]/20"
                     }`}
                   >
                     <input
@@ -631,13 +631,13 @@ export function BannersView({ initialBanners }: BannersViewProps) {
 
                     {isUploadingImage ? (
                       <div className="flex flex-col items-center gap-2 py-4">
-                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                        <p className="text-xs font-bold text-primary">Subiendo imagen al servidor...</p>
+                        <Loader2 className="w-8 h-8 text-[#6D4BB8] animate-spin" />
+                        <p className="text-xs font-bold text-[#6D4BB8]">Subiendo imagen al servidor...</p>
                         <p className="text-[11px] text-stone-400">Por favor espera un momento</p>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-center py-2">
-                        <div className="w-12 h-12 rounded-2xl bg-white border border-stone-200 shadow-2xs flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                        <div className="w-12 h-12 rounded-2xl bg-white border border-stone-200 shadow-2xs flex items-center justify-center text-[#6D4BB8] group-hover:scale-110 transition-transform">
                           <Upload className="w-6 h-6" />
                         </div>
                         <div>
@@ -648,7 +648,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                             Recomendado: PNG con fondo transparente, JPG o WebP (máx. 5MB)
                           </p>
                         </div>
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary px-3.5 py-1.5 bg-white rounded-full border border-primary/20 shadow-2xs mt-1 hover:bg-primary/5">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#6D4BB8] px-3.5 py-1.5 bg-white rounded-full border border-[#6D4BB8]/30 shadow-2xs mt-1 hover:bg-[#EEEAFB]/30">
                           <Upload className="w-3.5 h-3.5" />
                           Subir imagen desde tu equipo
                         </span>
@@ -668,7 +668,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                     min="1"
                     value={formData.sort_order || 1}
                     onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-[#6D4BB8]/20 focus:border-[#6D4BB8] text-sm"
                   />
                 </div>
 
@@ -681,7 +681,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                       type="checkbox"
                       checked={formData.is_active ?? true}
                       onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="w-4 h-4 text-primary rounded border-stone-300 focus:ring-primary"
+                      className="w-4 h-4 text-[#6D4BB8] rounded border-stone-300 focus:ring-[#6D4BB8]"
                     />
                     <span className="text-sm text-stone-700 font-medium">Visible en tienda</span>
                   </label>
@@ -708,7 +708,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                 <button
                   type="submit"
                   disabled={isSubmitting || isUploadingImage || (!editingBanner && isLimitReached)}
-                  className="inline-flex items-center gap-2 px-5 py-2 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl text-sm shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#6D4BB8] hover:bg-[#5837A3] text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Guardar Banner</span>
