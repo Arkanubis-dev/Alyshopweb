@@ -595,4 +595,129 @@ export async function bulkImportProductsAction(
   }
 }
 
+export interface BulkImageAttachment {
+  productId: string;
+  imageUrl: string;
+}
+
+export async function bulkAttachProductImagesAction(
+  attachments: BulkImageAttachment[]
+): Promise<{ success: boolean; count: number; error?: string; updatedProducts?: Product[] }> {
+  try {
+    if (!attachments || attachments.length === 0) {
+      return { success: true, count: 0, updatedProducts: [] };
+    }
+
+    const supabase = createAdminClient();
+    const updatedProductList: Product[] = [];
+
+    // Group images by productId
+    const attachmentsByProduct = new Map<string, string[]>();
+    for (const att of attachments) {
+      if (att.productId && att.imageUrl) {
+        const existing = attachmentsByProduct.get(att.productId) || [];
+        existing.push(att.imageUrl);
+        attachmentsByProduct.set(att.productId, existing);
+      }
+    }
+
+    const targetProductIds = Array.from(attachmentsByProduct.keys());
+
+    if (supabase) {
+      for (const [prodId, newUrls] of attachmentsByProduct.entries()) {
+        // Fetch current images for this product
+        const { data: existingImages } = await supabase
+          .from("product_images")
+          .select("id, url, sort_order, is_primary")
+          .eq("product_id", prodId);
+
+        // Detect placeholder images (such as Unsplash default or placeholder URLs)
+        const placeholderIds = (existingImages || [])
+          .filter(
+            (img: any) =>
+              img.url?.includes("unsplash.com") ||
+              img.url?.includes("placeholder")
+          )
+          .map((img: any) => img.id);
+
+        if (placeholderIds.length > 0) {
+          await supabase.from("product_images").delete().in("id", placeholderIds);
+        }
+
+        // Existing real images
+        const realExisting = (existingImages || []).filter(
+          (img: any) => !placeholderIds.includes(img.id)
+        );
+
+        // If there were real existing images, unmark them as primary
+        if (realExisting.length > 0) {
+          await supabase
+            .from("product_images")
+            .update({ is_primary: false })
+            .eq("product_id", prodId);
+        }
+
+        // Insert new images
+        const newRows = newUrls.map((url, idx) => ({
+          product_id: prodId,
+          url,
+          sort_order: idx + 1,
+          is_primary: idx === 0,
+        }));
+
+        await supabase.from("product_images").insert(newRows);
+      }
+    }
+
+    // Update in-memory fallback store
+    for (let i = 0; i < adminProductsStore.length; i++) {
+      const p = adminProductsStore[i];
+      if (attachmentsByProduct.has(p.id)) {
+        const newUrls = attachmentsByProduct.get(p.id)!;
+        const realExisting = (p.images || []).filter(
+          (img) => !img.url.includes("unsplash.com") && !img.url.includes("placeholder")
+        );
+
+        const updatedImgs = [
+          ...newUrls.map((url, idx) => ({
+            id: `img-${p.id}-${Date.now()}-${idx}`,
+            url,
+            sort_order: idx + 1,
+            is_primary: idx === 0,
+          })),
+          ...realExisting.map((img, idx) => ({
+            ...img,
+            sort_order: newUrls.length + idx + 1,
+            is_primary: false,
+          })),
+        ];
+
+        const updatedProd: Product = {
+          ...p,
+          images: updatedImgs,
+        };
+
+        adminProductsStore[i] = updatedProd;
+        updatedProductList.push(updatedProd);
+      }
+    }
+
+    revalidatePath("/admin/productos");
+    revalidatePath("/admin");
+    revalidatePath("/categoria/[slug]", "page");
+    revalidatePath("/producto/[slug]", "page");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      count: targetProductIds.length,
+      updatedProducts: updatedProductList,
+    };
+  } catch (err: any) {
+    console.error("Error in bulkAttachProductImagesAction:", err);
+    return { success: false, count: 0, error: err.message || "Error al asociar imágenes masivas" };
+  }
+}
+
+
 

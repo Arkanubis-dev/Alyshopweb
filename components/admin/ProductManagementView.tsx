@@ -29,6 +29,11 @@ import {
   FileSpreadsheet,
   FileDown,
   PowerOff,
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Info,
 } from "lucide-react";
 import { Product, Category } from "@/types";
 import { formatCOP } from "@/lib/utils";
@@ -43,8 +48,10 @@ import {
   bulkUpdateProductStatusAction,
   bulkDeleteProductsAction,
   bulkImportProductsAction,
+  bulkAttachProductImagesAction,
   BulkProductInput,
 } from "@/app/actions/products";
+import { findBestMatchingProduct, MatchConfidence } from "@/lib/product-matcher";
 
 interface ProductManagementViewProps {
   initialProducts: Product[];
@@ -85,7 +92,45 @@ export function ProductManagementView({
   const [isImportingExcel, setIsImportingExcel] = useState(false);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Bulk Photos Upload State (Box of 50 photos max)
+  const [isBulkPhotosOpen, setIsBulkPhotosOpen] = useState(false);
+  const [bulkPhotosQueue, setBulkPhotosQueue] = useState<Array<{
+    id: string;
+    file: File;
+    fileName: string;
+    previewUrl: string;
+    assignedProductId: string;
+    confidence: MatchConfidence;
+    reason?: string;
+    status: "idle" | "uploading" | "success" | "error";
+    error?: string;
+  }>>([]);
+  const [isUploadingBulkPhotos, setIsUploadingBulkPhotos] = useState(false);
+  const [bulkUploadProgress, setBulkUploadProgress] = useState<{
+    current: number;
+    total: number;
+    currentFileName: string;
+  }>({ current: 0, total: 0, currentFileName: "" });
+  const [isDraggingBulkPhotos, setIsDraggingBulkPhotos] = useState(false);
+  const bulkPhotosInputRef = useRef<HTMLInputElement>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sorted products for the manual selection dropdowns
+  const sortedCatalogProducts = useMemo(() => {
+    return [...products].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  }, [products]);
+
+  // Clean up preview object URLs on unmount
+  useEffect(() => {
+    return () => {
+      bulkPhotosQueue.forEach((item) => {
+        try {
+          URL.revokeObjectURL(item.previewUrl);
+        } catch {}
+      });
+    };
+  }, [bulkPhotosQueue]);
 
   const showToast = (text: string, type: "success" | "error" = "success") => {
     setNotification({ type, text });
@@ -452,6 +497,237 @@ export function ProductManagementView({
     }
   };
 
+  // =================================================================
+  // BULK PHOTOS HANDLERS (HASTA 50 FOTOS)
+  // =================================================================
+  const handleAddFilesToBulkQueue = (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const imageFiles = fileArray.filter((f) =>
+      f.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(f.name)
+    );
+
+    if (imageFiles.length === 0) {
+      showToast("Por favor selecciona archivos de imagen válidos (PNG, JPG, WEBP)", "error");
+      return;
+    }
+
+    const MAX_LIMIT = 50;
+    const currentCount = bulkPhotosQueue.length;
+    const availableSlots = Math.max(0, MAX_LIMIT - currentCount);
+
+    if (availableSlots <= 0) {
+      showToast(
+        "La caja ya tiene el límite de 50 fotos. Procesa o limpia el lote antes de agregar más.",
+        "error"
+      );
+      return;
+    }
+
+    let filesToAdd = imageFiles;
+    if (imageFiles.length > availableSlots) {
+      filesToAdd = imageFiles.slice(0, availableSlots);
+      showToast(
+        `Se agregaron ${availableSlots} fotos (límite de 50 fotos por lote para evitar sobrecarga).`,
+        "error"
+      );
+    } else {
+      showToast(`Se agregaron ${filesToAdd.length} foto(s) a la caja de carga.`);
+    }
+
+    const newItems = filesToAdd.map((file, idx) => {
+      const match = findBestMatchingProduct(file.name, products);
+      return {
+        id: `${file.name}-${Date.now()}-${idx}-${Math.random()}`,
+        file,
+        fileName: file.name,
+        previewUrl: URL.createObjectURL(file),
+        assignedProductId: match.product ? match.product.id : "",
+        confidence: match.confidence,
+        reason: match.reason,
+        status: "idle" as const,
+      };
+    });
+
+    setBulkPhotosQueue((prev) => [...prev, ...newItems]);
+    setIsBulkPhotosOpen(true);
+  };
+
+  const handleBulkPhotosFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleAddFilesToBulkQueue(e.target.files);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveBulkPhotoItem = (id: string) => {
+    setBulkPhotosQueue((prev) => {
+      const item = prev.find((i) => i.id === id);
+      if (item?.previewUrl) {
+        try {
+          URL.revokeObjectURL(item.previewUrl);
+        } catch {}
+      }
+      return prev.filter((i) => i.id !== id);
+    });
+  };
+
+  const handleClearBulkPhotos = () => {
+    bulkPhotosQueue.forEach((item) => {
+      try {
+        URL.revokeObjectURL(item.previewUrl);
+      } catch {}
+    });
+    setBulkPhotosQueue([]);
+  };
+
+  const handleAssignProductToPhoto = (photoId: string, newProductId: string) => {
+    setBulkPhotosQueue((prev) =>
+      prev.map((item) => {
+        if (item.id === photoId) {
+          const prod = products.find((p) => p.id === newProductId);
+          return {
+            ...item,
+            assignedProductId: newProductId,
+            confidence: newProductId ? ("exact" as MatchConfidence) : ("none" as MatchConfidence),
+            reason: prod ? `Asignado manualmente: ${prod.name}` : undefined,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleProcessBulkPhotos = async () => {
+    const validItems = bulkPhotosQueue.filter((item) => Boolean(item.assignedProductId));
+
+    if (validItems.length === 0) {
+      showToast(
+        "Ninguna foto tiene un producto asignado. Por favor asigna productos antes de subir.",
+        "error"
+      );
+      return;
+    }
+
+    if (validItems.length < bulkPhotosQueue.length) {
+      const unassignedCount = bulkPhotosQueue.length - validItems.length;
+      const confirmContinue = window.confirm(
+        `Hay ${unassignedCount} foto(s) sin producto asignado. Se subirán y asociarán las ${validItems.length} fotos que sí tienen producto asignado. ¿Deseas continuar?`
+      );
+      if (!confirmContinue) return;
+    }
+
+    setIsUploadingBulkPhotos(true);
+    setBulkUploadProgress({
+      current: 0,
+      total: validItems.length,
+      currentFileName: validItems[0].fileName,
+    });
+
+    const successfulAttachments: Array<{ productId: string; imageUrl: string }> = [];
+    const CONCURRENCY = 2; // Process 2 at a time for optimal speed and memory stability
+
+    try {
+      for (let i = 0; i < validItems.length; i += CONCURRENCY) {
+        const chunk = validItems.slice(i, i + CONCURRENCY);
+
+        await Promise.all(
+          chunk.map(async (item, chunkIndex) => {
+            const currentIndex = i + chunkIndex + 1;
+            setBulkUploadProgress({
+              current: currentIndex,
+              total: validItems.length,
+              currentFileName: item.fileName,
+            });
+
+            // Set item status to uploading
+            setBulkPhotosQueue((prev) =>
+              prev.map((p) => (p.id === item.id ? { ...p, status: "uploading" } : p))
+            );
+
+            try {
+              // Compress image client side (1000x1000 JPEG quality 0.85)
+              const { file: compressedFile } = await compressAndResizeImage(
+                item.file,
+                1000,
+                1000,
+                0.85
+              );
+
+              const formData = new FormData();
+              formData.append("file", compressedFile);
+
+              const uploadRes = await uploadProductImageAction(formData);
+
+              if (uploadRes.success && uploadRes.url) {
+                successfulAttachments.push({
+                  productId: item.assignedProductId,
+                  imageUrl: uploadRes.url,
+                });
+
+                setBulkPhotosQueue((prev) =>
+                  prev.map((p) =>
+                    p.id === item.id ? { ...p, status: "success" } : p
+                  )
+                );
+              } else {
+                setBulkPhotosQueue((prev) =>
+                  prev.map((p) =>
+                    p.id === item.id
+                      ? { ...p, status: "error", error: uploadRes.error || "Error al subir" }
+                      : p
+                  )
+                );
+              }
+            } catch (err: any) {
+              setBulkPhotosQueue((prev) =>
+                prev.map((p) =>
+                  p.id === item.id
+                    ? { ...p, status: "error", error: err.message || "Error al procesar" }
+                    : p
+                )
+              );
+            }
+          })
+        );
+      }
+
+      if (successfulAttachments.length > 0) {
+        const attachRes = await bulkAttachProductImagesAction(successfulAttachments);
+        if (attachRes.success && attachRes.updatedProducts) {
+          showToast(`¡${attachRes.count} fotos subidas y asociadas exitosamente a sus productos!`);
+
+          // Update local products state
+          const updatedMap = new Map(attachRes.updatedProducts.map((p) => [p.id, p]));
+          setProducts((prev) => prev.map((p) => updatedMap.get(p.id) || p));
+
+          // Clean up successful items
+          setBulkPhotosQueue((prev) => {
+            const remaining = prev.filter((item) => item.status !== "success");
+            prev
+              .filter((item) => item.status === "success")
+              .forEach((item) => {
+                try {
+                  URL.revokeObjectURL(item.previewUrl);
+                } catch {}
+              });
+            if (remaining.length === 0) {
+              setIsBulkPhotosOpen(false);
+            }
+            return remaining;
+          });
+        } else {
+          showToast(attachRes.error || "Error al asociar las fotos a los productos", "error");
+        }
+      } else {
+        showToast("No se pudo subir ninguna foto. Revisa los errores.", "error");
+      }
+    } catch (err: any) {
+      showToast("Error general durante la carga: " + err.message, "error");
+    } finally {
+      setIsUploadingBulkPhotos(false);
+    }
+  };
+
   const handleOpenCreate = () => {
     setEditingProduct({
       name: "",
@@ -737,6 +1013,30 @@ export function ProductManagementView({
             />
           </label>
 
+          {/* Carga Masiva Fotos (hasta 50) */}
+          <button
+            type="button"
+            onClick={() => setIsBulkPhotosOpen(!isBulkPhotosOpen)}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-xs font-bold shadow-2xs transition-all cursor-pointer ${
+              isBulkPhotosOpen
+                ? "bg-[#6D4BB8] text-white border-[#5837A3]"
+                : "bg-purple-50 hover:bg-purple-100 border-purple-200 text-[#6D4BB8]"
+            }`}
+            title="Subir lotes de hasta 50 imágenes y asociarlas automáticamente a los productos por nombre coincidente"
+          >
+            <ImageIcon className={`w-4 h-4 ${isBulkPhotosOpen ? "text-white" : "text-[#6D4BB8]"}`} />
+            <span>Carga Masiva Fotos</span>
+            <span
+              className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                isBulkPhotosOpen
+                  ? "bg-white/20 text-white"
+                  : "bg-[#6D4BB8] text-white"
+              }`}
+            >
+              {bulkPhotosQueue.length > 0 ? `${bulkPhotosQueue.length}/50` : "Hasta 50"}
+            </span>
+          </button>
+
           {/* Exportar CSV */}
           <button
             type="button"
@@ -758,6 +1058,337 @@ export function ProductManagementView({
           </button>
         </div>
       </div>
+
+      {/* ================================================================= */}
+      {/* CAJA DE CARGA MASIVA DE FOTOS (HASTA 50 FOTOS) */}
+      {/* ================================================================= */}
+      {isBulkPhotosOpen && (
+        <div className="bg-white rounded-3xl border-2 border-[#D8C7F0] shadow-lg p-5 sm:p-6 space-y-5 animate-in slide-in-from-top-3 duration-200">
+          {/* Header of Bulk Photos Box */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#F0E8F2]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#FAF5FB] border border-[#E8DEF8] flex items-center justify-center text-[#6D4BB8] shrink-0">
+                <ImageIcon className="w-5 h-5 text-[#6D4BB8]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-extrabold text-[#2E2A3B]">
+                    Caja de Carga Masiva de Fotos
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#FCE4EF] text-[#D83A7D] border border-[#F472A8]/30">
+                    Lotes de hasta 50 fotos
+                  </span>
+                </div>
+                <p className="text-xs text-[#7A7590]">
+                  Asocia automáticamente las imágenes con tus productos comparando el nombre del archivo con el nombre o SKU del producto.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              {bulkPhotosQueue.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearBulkPhotos}
+                  disabled={isUploadingBulkPhotos}
+                  className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Limpiar Cola
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsBulkPhotosOpen(false)}
+                disabled={isUploadingBulkPhotos}
+                className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Cerrar caja"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Educational banner */}
+          <div className="p-3.5 rounded-2xl bg-[#FAF5FB] border border-[#E8DEF8] flex items-start gap-3 text-xs text-[#2E2A3B]">
+            <Sparkles className="w-4 h-4 text-[#F472A8] shrink-0 mt-0.5" />
+            <div className="space-y-0.5 leading-relaxed">
+              <p>
+                <strong>¿Cómo funciona la coincidencia?</strong> Nombra tus archivos PNG, JPG o WEBP igual o muy parecido al producto cargado (ejemplo: <code className="bg-white px-1.5 py-0.5 rounded text-[#6D4BB8] font-bold border border-[#E8DEF8]">Termo Acero Inoxidable 500 ml.jpg</code> o con su SKU <code className="bg-white px-1.5 py-0.5 rounded text-[#6D4BB8] font-bold border border-[#E8DEF8]">ALY-TER-01.png</code>).
+              </p>
+              <p className="text-[#7A7590]">
+                El sistema detectará el producto correspondiente automáticamente. Si alguna foto no tiene coincidencia o deseas cambiarla, podrás elegir el producto en la lista desplegable antes de guardar.
+              </p>
+            </div>
+          </div>
+
+          {/* Drag & Drop Area */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDraggingBulkPhotos(true);
+            }}
+            onDragLeave={() => setIsDraggingBulkPhotos(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingBulkPhotos(false);
+              if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleAddFilesToBulkQueue(e.dataTransfer.files);
+              }
+            }}
+            className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
+              isDraggingBulkPhotos
+                ? "border-[#6D4BB8] bg-[#F3ECFB] scale-[0.99]"
+                : "border-[#D8C7F0] bg-[#FAF5FB]/60 hover:bg-[#FAF5FB] hover:border-[#6D4BB8]"
+            }`}
+          >
+            <input
+              ref={bulkPhotosInputRef}
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp,image/jpg"
+              className="hidden"
+              onChange={handleBulkPhotosFileInput}
+            />
+
+            <div className="flex flex-col items-center justify-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-white shadow-2xs border border-[#E8DEF8] flex items-center justify-center text-[#6D4BB8]">
+                <UploadCloud className="w-6 h-6 text-[#6D4BB8]" />
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm font-bold text-[#2E2A3B]">
+                  Arrastra y suelta tus fotos aquí o{" "}
+                  <button
+                    type="button"
+                    onClick={() => bulkPhotosInputRef.current?.click()}
+                    disabled={isUploadingBulkPhotos}
+                    className="text-[#6D4BB8] hover:underline font-extrabold cursor-pointer"
+                  >
+                    haz clic para explorar
+                  </button>
+                </p>
+                <p className="text-[11px] text-[#7A7590] mt-1">
+                  Formatos soportados: PNG, JPG, JPEG, WEBP. Máximo 50 fotos por lote para no sobrecargar el navegador.
+                </p>
+              </div>
+
+              {bulkPhotosQueue.length < 50 && (
+                <button
+                  type="button"
+                  onClick={() => bulkPhotosInputRef.current?.click()}
+                  disabled={isUploadingBulkPhotos}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Seleccionar Fotos (Lote hasta 50)</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Queue Statistics & Action Trigger */}
+          {bulkPhotosQueue.length > 0 && (
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white border border-[#E8DEF8] shadow-2xs">
+                {/* Stats */}
+                <div className="flex items-center gap-2.5 flex-wrap text-xs">
+                  <span className="font-extrabold text-[#2E2A3B]">
+                    Cola de fotos: {bulkPhotosQueue.length}/50
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {bulkPhotosQueue.filter((i) => Boolean(i.assignedProductId)).length} asociadas
+                  </span>
+                  {bulkPhotosQueue.some((i) => !i.assignedProductId) && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      {bulkPhotosQueue.filter((i) => !i.assignedProductId).length} sin asociar
+                    </span>
+                  )}
+                </div>
+
+                {/* Upload Button */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isUploadingBulkPhotos || bulkPhotosQueue.filter((i) => Boolean(i.assignedProductId)).length === 0}
+                    onClick={handleProcessBulkPhotos}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUploadingBulkPhotos ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Subiendo {bulkUploadProgress.current} de {bulkUploadProgress.total}...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-4 h-4" />
+                        <span>
+                          Subir y Asociar {bulkPhotosQueue.filter((i) => Boolean(i.assignedProductId)).length} Foto(s)
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress bar when uploading */}
+              {isUploadingBulkPhotos && (
+                <div className="p-4 rounded-2xl bg-[#FAF5FB] border border-[#E8DEF8] space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#2E2A3B]">
+                    <div className="flex items-center gap-2 truncate max-w-[80%]">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#6D4BB8] shrink-0" />
+                      <span className="truncate">
+                        Subiendo foto {bulkUploadProgress.current} de {bulkUploadProgress.total}:{" "}
+                        <span className="text-[#6D4BB8]">{bulkUploadProgress.currentFileName}</span>
+                      </span>
+                    </div>
+                    <span className="text-[#6D4BB8]">
+                      {Math.round(
+                        (bulkUploadProgress.current / Math.max(1, bulkUploadProgress.total)) * 100
+                      )}
+                      %
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-[#6D4BB8] to-[#F472A8] h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.round(
+                          (bulkUploadProgress.current / Math.max(1, bulkUploadProgress.total)) * 100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Photos Cards Grid */}
+              <div className="max-h-[460px] overflow-y-auto space-y-2.5 pr-1.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {bulkPhotosQueue.map((item, index) => {
+                    const assignedProd = products.find((p) => p.id === item.assignedProductId);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`p-3 rounded-2xl border transition-all flex items-start gap-3 relative ${
+                          item.status === "uploading"
+                            ? "border-[#6D4BB8] bg-purple-50/50"
+                            : item.status === "success"
+                            ? "border-emerald-300 bg-emerald-50/30"
+                            : item.status === "error"
+                            ? "border-rose-300 bg-rose-50/30"
+                            : item.assignedProductId
+                            ? "border-[#E8DEF8] bg-white hover:border-[#6D4BB8]/60"
+                            : "border-amber-200 bg-amber-50/20"
+                        }`}
+                      >
+                        {/* Remove item button */}
+                        {!isUploadingBulkPhotos && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBulkPhotoItem(item.id)}
+                            className="absolute top-2 right-2 p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Quitar foto de la lista"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {/* Thumbnail */}
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.previewUrl}
+                            alt={item.fileName}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] font-bold px-1 rounded-tl">
+                            #{index + 1}
+                          </div>
+                        </div>
+
+                        {/* Details and Product Match Selector */}
+                        <div className="flex-1 min-w-0 pr-4 space-y-1.5">
+                          {/* File Name */}
+                          <p
+                            className="text-xs font-bold text-[#2E2A3B] truncate"
+                            title={item.fileName}
+                          >
+                            {item.fileName}
+                          </p>
+
+                          {/* Match / Status Badge */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {item.status === "uploading" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-[#6D4BB8]">
+                                <Loader2 className="w-3 h-3 animate-spin" /> Subiendo...
+                              </span>
+                            ) : item.status === "success" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                <Check className="w-3 h-3" /> Asociada con éxito
+                              </span>
+                            ) : item.status === "error" ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700"
+                                title={item.error}
+                              >
+                                <X className="w-3 h-3" /> Error: {item.error || "Fallo"}
+                              </span>
+                            ) : item.assignedProductId ? (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  item.confidence === "exact"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                }`}
+                                title={item.reason}
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                {item.confidence === "exact"
+                                  ? "Coincidencia exacta"
+                                  : "Coincidencia aproximada"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                <AlertCircle className="w-3 h-3" /> Sin coincidencia automática
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Product Selection Dropdown */}
+                          <div className="space-y-0.5">
+                            <label className="text-[10px] font-bold text-[#7A7590] uppercase tracking-wider block">
+                              Producto a vincular:
+                            </label>
+                            <select
+                              value={item.assignedProductId}
+                              onChange={(e) => handleAssignProductToPhoto(item.id, e.target.value)}
+                              disabled={isUploadingBulkPhotos || item.status === "success"}
+                              className={`w-full text-[11px] py-1 px-2 rounded-lg border font-semibold focus:outline-none focus:border-[#6D4BB8] ${
+                                item.assignedProductId
+                                  ? "bg-white text-[#2E2A3B] border-[#D8C7F0]"
+                                  : "bg-amber-50 text-amber-900 border-amber-300 font-bold"
+                              }`}
+                            >
+                              <option value="">-- Seleccionar producto manual --</option>
+                              {sortedCatalogProducts.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} {p.sku ? `(${p.sku})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search and Filters Toolbar */}
       <div className="bg-white p-4 rounded-2xl border border-[#F0E8F2] shadow-xs flex flex-wrap items-center justify-between gap-3">
