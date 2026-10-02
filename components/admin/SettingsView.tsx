@@ -152,12 +152,12 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
           type="button"
           onClick={() => handleSubmit()}
           disabled={isSubmitting}
-          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all text-sm shrink-0 active:scale-95 disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-[#6D4BB8] hover:bg-[#5837A3] text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all text-sm shrink-0 active:scale-95 disabled:opacity-50 cursor-pointer"
         >
           {isSubmitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
           ) : (
-            <Check className="w-4 h-4 text-[#F472A8]" />
+            <Check className="w-4 h-4 text-white" />
           )}
           <span>Guardar Configuración</span>
         </button>
@@ -643,12 +643,12 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
                   type="button"
                   onClick={() => handleSubmit()}
                   disabled={isSubmitting}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
                   ) : (
-                    <Sparkles className="w-4 h-4 text-[#F472A8]" />
+                    <Sparkles className="w-4 h-4 text-white" />
                   )}
                   <span>Guardar y Aplicar Paleta Ahora</span>
                 </button>
@@ -901,14 +901,14 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all text-sm active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-[#6D4BB8] hover:bg-[#5837A3] text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all text-sm active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-white" />
             ) : (
-              <Check className="w-4 h-4 text-[#F472A8]" />
+              <Check className="w-4 h-4 text-white" />
             )}
-            <span>Guardar Toda la Configuración & Colores</span>
+            <span>Guardar Toda la Configuración</span>
           </button>
         </div>
       </form>

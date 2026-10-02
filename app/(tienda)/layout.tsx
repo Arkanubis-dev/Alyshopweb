@@ -16,7 +16,7 @@ export default async function TiendaLayout({
   const settings = await getAdminSettingsAction();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FFFBF7]">
+    <div className="tienda-root min-h-screen flex flex-col bg-[#FFFBF7]">
       <Header
         logoUrl={settings.logo_url}
         storeName={settings.name}

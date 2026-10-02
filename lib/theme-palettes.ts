@@ -170,156 +170,150 @@ export function generateThemeCSS(settings?: {
     }
 
     /* 1. Primary Brand Overrides (#6D4BB8) */
-    .text-\\[\\#6D4BB8\\], .text-\\[\\#6d4bb8\\],
-    [class*="text-[#6D4BB8]"], [class*="text-[#6d4bb8]"] {
+    .tienda-root .text-\\[\\#6D4BB8\\], .tienda-root .text-\\[\\#6d4bb8\\],
+    .tienda-root [class*="text-[#6D4BB8]"], .tienda-root [class*="text-[#6d4bb8]"] {
       color: var(--color-primary) !important;
     }
 
-    .hover\\:text-\\[\\#6D4BB8\\]:hover, .hover\\:text-\\[\\#6d4bb8\\]:hover,
-    [class*="hover:text-[#6D4BB8]"]:hover, [class*="hover:text-[#6d4bb8]"]:hover {
+    .tienda-root .hover\\:text-\\[\\#6D4BB8\\]:hover, .tienda-root .hover\\:text-\\[\\#6d4bb8\\]:hover,
+    .tienda-root [class*="hover:text-[#6D4BB8]"]:hover, .tienda-root [class*="hover:text-[#6d4bb8]"]:hover {
       color: var(--color-primary) !important;
     }
 
-    .bg-\\[\\#6D4BB8\\], .bg-\\[\\#6d4bb8\\],
-    [class*="bg-[#6D4BB8]"], [class*="bg-[#6d4bb8]"] {
+    .tienda-root .bg-\\[\\#6D4BB8\\], .tienda-root .bg-\\[\\#6d4bb8\\],
+    .tienda-root [class*="bg-[#6D4BB8]"], .tienda-root [class*="bg-[#6d4bb8]"] {
       background-color: var(--color-primary) !important;
     }
 
-    .hover\\:bg-\\[\\#6D4BB8\\]:hover, .hover\\:bg-\\[\\#6d4bb8\\]:hover,
-    .hover\\:bg-\\[\\#5837A3\\]:hover, .hover\\:bg-\\[\\#5837a3\\]:hover,
-    .hover\\:bg-\\[\\#55359A\\]:hover, .hover\\:bg-\\[\\#55359a\\]:hover,
-    [class*="hover:bg-[#6D4BB8]"]:hover, [class*="hover:bg-[#6d4bb8]"]:hover,
-    [class*="hover:bg-[#5837A3]"]:hover, [class*="hover:bg-[#5837a3]"]:hover,
-    [class*="hover:bg-[#55359A]"]:hover, [class*="hover:bg-[#55359a]"]:hover {
+    .tienda-root .hover\\:bg-\\[\\#6D4BB8\\]:hover, .tienda-root .hover\\:bg-\\[\\#6d4bb8\\]:hover,
+    .tienda-root .hover\\:bg-\\[\\#5837A3\\]:hover, .tienda-root .hover\\:bg-\\[\\#5837a3\\]:hover,
+    .tienda-root .hover\\:bg-\\[\\#55359A\\]:hover, .tienda-root .hover\\:bg-\\[\\#55359a\\]:hover,
+    .tienda-root [class*="hover:bg-[#6D4BB8]"]:hover, .tienda-root [class*="hover:bg-[#6d4bb8]"]:hover,
+    .tienda-root [class*="hover:bg-[#5837A3]"]:hover, .tienda-root [class*="hover:bg-[#5837a3]"]:hover,
+    .tienda-root [class*="hover:bg-[#55359A]"]:hover, .tienda-root [class*="hover:bg-[#55359a]"]:hover {
       background-color: var(--color-primary-hover) !important;
     }
 
-    .border-\\[\\#6D4BB8\\], .border-\\[\\#6d4bb8\\],
-    [class*="border-[#6D4BB8]"], [class*="border-[#6d4bb8]"] {
+    .tienda-root .border-\\[\\#6D4BB8\\], .tienda-root .border-\\[\\#6d4bb8\\],
+    .tienda-root [class*="border-[#6D4BB8]"], .tienda-root [class*="border-[#6d4bb8]"] {
       border-color: var(--color-primary) !important;
     }
 
-    .ring-\\[\\#6D4BB8\\], .ring-\\[\\#6d4bb8\\],
-    [class*="ring-[#6D4BB8]"], [class*="ring-[#6d4bb8]"] {
+    .tienda-root .ring-\\[\\#6D4BB8\\], .tienda-root .ring-\\[\\#6d4bb8\\],
+    .tienda-root [class*="ring-[#6D4BB8]"], .tienda-root [class*="ring-[#6d4bb8]"] {
       --tw-ring-color: var(--color-primary) !important;
     }
 
-    .fill-\\[\\#6D4BB8\\], .fill-\\[\\#6d4bb8\\],
-    [class*="fill-[#6D4BB8]"], [class*="fill-[#6d4bb8]"] {
+    .tienda-root .fill-\\[\\#6D4BB8\\], .tienda-root .fill-\\[\\#6d4bb8\\],
+    .tienda-root [class*="fill-[#6D4BB8]"], .tienda-root [class*="fill-[#6d4bb8]"] {
       fill: var(--color-primary) !important;
     }
 
-    .group:hover .group-hover\\:text-\\[\\#6D4BB8\\],
-    .group:hover .group-hover\\:text-\\[\\#6d4bb8\\],
-    [class*="group"]:hover [class*="group-hover:text-[#6D4BB8]"],
-    [class*="group"]:hover [class*="group-hover:text-[#6d4bb8]"] {
+    .tienda-root .group:hover .group-hover\\:text-\\[\\#6D4BB8\\],
+    .tienda-root .group:hover .group-hover\\:text-\\[\\#6d4bb8\\],
+    .tienda-root [class*="group"]:hover [class*="group-hover:text-[#6D4BB8]"],
+    .tienda-root [class*="group"]:hover [class*="group-hover:text-[#6d4bb8]"] {
       color: var(--color-primary) !important;
     }
 
-    .group:hover .group-hover\\:bg-\\[\\#6D4BB8\\],
-    .group:hover .group-hover\\:bg-\\[\\#6d4bb8\\],
-    [class*="group"]:hover [class*="group-hover:bg-[#6D4BB8]"],
-    [class*="group"]:hover [class*="group-hover:bg-[#6d4bb8]"] {
+    .tienda-root .group:hover .group-hover\\:bg-\\[\\#6D4BB8\\],
+    .tienda-root .group:hover .group-hover\\:bg-\\[\\#6d4bb8\\],
+    .tienda-root [class*="group"]:hover [class*="group-hover:bg-[#6D4BB8]"],
+    .tienda-root [class*="group"]:hover [class*="group-hover:bg-[#6d4bb8]"] {
       background-color: var(--color-primary) !important;
     }
 
-    .from-\\[\\#6D4BB8\\], .from-\\[\\#6d4bb8\\],
-    [class*="from-[#6D4BB8]"], [class*="from-[#6d4bb8]"] {
-      --tw-gradient-from: var(--color-primary) var(--tw-gradient-from-position) !important;
-      --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position)) !important;
+    .tienda-root .from-\\[\\#6D4BB8\\], .tienda-root .from-\\[\\#6d4bb8\\],
+    .tienda-root [class*="from-[#6D4BB8]"], .tienda-root [class*="from-[#6d4bb8]"] {
+      background-color: var(--color-primary, #6D4BB8) !important;
+      background-image: linear-gradient(135deg, var(--color-primary, #6D4BB8), var(--color-primary-hover, #5837A3)) !important;
     }
 
-    .to-\\[\\#5837A3\\], .to-\\[\\#5837a3\\],
-    [class*="to-[#5837A3]"], [class*="to-[#5837a3]"] {
-      --tw-gradient-to: var(--color-primary-hover) var(--tw-gradient-to-position) !important;
-    }
-
-    .bg-\\[\\#EEEAFB\\], .bg-\\[\\#eeeafb\\],
-    [class*="bg-[#EEEAFB]"], [class*="bg-[#eeeafb]"] {
+    .tienda-root .bg-\\[\\#EEEAFB\\], .tienda-root .bg-\\[\\#eeeafb\\],
+    .tienda-root [class*="bg-[#EEEAFB]"], .tienda-root [class*="bg-[#eeeafb]"] {
       background-color: var(--color-primary-light) !important;
     }
 
     /* 2. Secondary Color Overrides (#F472A8) */
-    .text-\\[\\#F472A8\\], .text-\\[\\#f472a8\\],
-    [class*="text-[#F472A8]"], [class*="text-[#f472a8]"] {
+    .tienda-root .text-\\[\\#F472A8\\], .tienda-root .text-\\[\\#f472a8\\],
+    .tienda-root [class*="text-[#F472A8]"], .tienda-root [class*="text-[#f472a8]"] {
       color: var(--color-secondary) !important;
     }
 
-    .hover\\:text-\\[\\#F472A8\\]:hover, .hover\\:text-\\[\\#f472a8\\]:hover,
-    [class*="hover:text-[#F472A8]"]:hover, [class*="hover:text-[#f472a8]"]:hover {
+    .tienda-root .hover\\:text-\\[\\#F472A8\\]:hover, .tienda-root .hover\\:text-\\[\\#f472a8\\]:hover,
+    .tienda-root [class*="hover:text-[#F472A8]"]:hover, .tienda-root [class*="hover:text-[#f472a8]"]:hover {
       color: var(--color-secondary) !important;
     }
 
-    .bg-\\[\\#F472A8\\], .bg-\\[\\#f472a8\\],
-    [class*="bg-[#F472A8]"], [class*="bg-[#f472a8]"] {
+    .tienda-root .bg-\\[\\#F472A8\\], .tienda-root .bg-\\[\\#f472a8\\],
+    .tienda-root [class*="bg-[#F472A8]"], .tienda-root [class*="bg-[#f472a8]"] {
       background-color: var(--color-secondary) !important;
     }
 
-    .hover\\:bg-\\[\\#F472A8\\]:hover, .hover\\:bg-\\[\\#f472a8\\]:hover,
-    .hover\\:bg-\\[\\#E35E96\\]:hover, .hover\\:bg-\\[\\#e35e96\\]:hover,
-    [class*="hover:bg-[#F472A8]"]:hover, [class*="hover:bg-[#f472a8]"]:hover,
-    [class*="hover:bg-[#E35E96]"]:hover, [class*="hover:bg-[#e35e96]"]:hover {
+    .tienda-root .hover\\:bg-\\[\\#F472A8\\]:hover, .tienda-root .hover\\:bg-\\[\\#f472a8\\]:hover,
+    .tienda-root .hover\\:bg-\\[\\#E35E96\\]:hover, .tienda-root .hover\\:bg-\\[\\#e35e96\\]:hover,
+    .tienda-root [class*="hover:bg-[#F472A8]"]:hover, .tienda-root [class*="hover:bg-[#f472a8]"]:hover,
+    .tienda-root [class*="hover:bg-[#E35E96]"]:hover, .tienda-root [class*="hover:bg-[#e35e96]"]:hover {
       background-color: var(--color-secondary-hover) !important;
     }
 
-    .border-\\[\\#F472A8\\], .border-\\[\\#f472a8\\],
-    [class*="border-[#F472A8]"], [class*="border-[#f472a8]"] {
+    .tienda-root .border-\\[\\#F472A8\\], .tienda-root .border-\\[\\#f472a8\\],
+    .tienda-root [class*="border-[#F472A8]"], .tienda-root [class*="border-[#f472a8]"] {
       border-color: var(--color-secondary) !important;
     }
 
-    .fill-\\[\\#F472A8\\], .fill-\\[\\#f472a8\\],
-    [class*="fill-[#F472A8]"], [class*="fill-[#f472a8]"] {
+    .tienda-root .fill-\\[\\#F472A8\\], .tienda-root .fill-\\[\\#f472a8\\],
+    .tienda-root [class*="fill-[#F472A8]"], .tienda-root [class*="fill-[#f472a8]"] {
       fill: var(--color-secondary) !important;
     }
 
-    .group:hover .group-hover\\:text-\\[\\#F472A8\\],
-    .group:hover .group-hover\\:text-\\[\\#f472a8\\],
-    [class*="group"]:hover [class*="group-hover:text-[#F472A8]"],
-    [class*="group"]:hover [class*="group-hover:text-[#f472a8]"] {
+    .tienda-root .group:hover .group-hover\\:text-\\[\\#F472A8\\],
+    .tienda-root .group:hover .group-hover\\:text-\\[\\#f472a8\\],
+    .tienda-root [class*="group"]:hover [class*="group-hover:text-[#F472A8]"],
+    .tienda-root [class*="group"]:hover [class*="group-hover:text-[#f472a8]"] {
       color: var(--color-secondary) !important;
     }
 
-    .bg-\\[\\#FCE4EF\\], .bg-\\[\\#fce4ef\\],
-    [class*="bg-[#FCE4EF]"], [class*="bg-[#fce4ef]"] {
+    .tienda-root .bg-\\[\\#FCE4EF\\], .tienda-root .bg-\\[\\#fce4ef\\],
+    .tienda-root [class*="bg-[#FCE4EF]"], .tienda-root [class*="bg-[#fce4ef]"] {
       background-color: var(--color-accent-bg) !important;
     }
 
     /* 3. Text and Headings (#2E2A3B) */
-    .text-\\[\\#2E2A3B\\], .text-\\[\\#2e2a3b\\],
-    [class*="text-[#2E2A3B]"], [class*="text-[#2e2a3b]"] {
+    .tienda-root .text-\\[\\#2E2A3B\\], .tienda-root .text-\\[\\#2e2a3b\\],
+    .tienda-root [class*="text-[#2E2A3B]"], .tienda-root [class*="text-[#2e2a3b]"] {
       color: var(--color-site-text) !important;
     }
 
     /* 4. Header Background & Dynamic Contrast */
-    header.sticky {
+    .tienda-root header.sticky {
       background-color: var(--color-header-bg) !important;
     }
 
     ${
       isDarkHeader
         ? `
-    header.sticky [class*="text-[#2E2A3B]"] {
+    .tienda-root header.sticky [class*="text-[#2E2A3B]"] {
       color: #FFFFFF !important;
     }
-    header.sticky [class*="text-[#7A7590]"] {
+    .tienda-root header.sticky [class*="text-[#7A7590]"] {
       color: rgba(255, 255, 255, 0.75) !important;
     }
-    header.sticky button:hover,
-    header.sticky a:hover {
+    .tienda-root header.sticky button:hover,
+    .tienda-root header.sticky a:hover {
       background-color: rgba(255, 255, 255, 0.12) !important;
     }
-    header.sticky [class*="border-[#F0E8F2]"] {
+    .tienda-root header.sticky [class*="border-[#F0E8F2]"] {
       border-color: rgba(255, 255, 255, 0.15) !important;
     }
-    header.sticky input[type="text"] {
+    .tienda-root header.sticky input[type="text"] {
       background-color: #FFFFFF !important;
       color: #2E2A3B !important;
     }
-    header.sticky [class*="bg-white"] [class*="text-[#2E2A3B]"] {
+    .tienda-root header.sticky [class*="bg-white"] [class*="text-[#2E2A3B]"] {
       color: #2E2A3B !important;
     }
-    header.sticky [class*="bg-white"] [class*="text-[#7A7590]"] {
+    .tienda-root header.sticky [class*="bg-white"] [class*="text-[#7A7590]"] {
       color: #7A7590 !important;
     }
     `

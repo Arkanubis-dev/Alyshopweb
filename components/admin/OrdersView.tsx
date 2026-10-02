@@ -551,9 +551,9 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
           <button
             type="button"
             onClick={handleOpenCreateOrder}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-[#F472A8]" />
+            <Plus className="w-4 h-4 text-white" />
             <span>Crear Pedido Manual</span>
           </button>
         </div>
@@ -1728,7 +1728,7 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                 type="button"
                 disabled={isCreatingOrder || createItems.length === 0 || !createCustomerName.trim()}
                 onClick={handleSaveCreateOrder}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isCreatingOrder ? (
                   <>
