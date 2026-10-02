@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Settings,
   Store,
@@ -36,6 +37,7 @@ interface SettingsViewProps {
 }
 
 export function SettingsView({ initialSettings }: SettingsViewProps) {
+  const router = useRouter();
   const [settings, setSettings] = useState<StoreSettings>({
     ...initialSettings,
     color_palette: initialSettings.color_palette || "pastel-morado",
@@ -91,15 +93,16 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setIsSubmitting(true);
 
     const res = await saveAdminSettingsAction(settings);
     setIsSubmitting(false);
 
     if (res.success) {
-      notify("success", "Configuración y colores guardados exitosamente");
+      notify("success", "¡Paleta de colores y ajustes guardados! Aplicados a toda la tienda.");
+      router.refresh();
     } else {
       notify("error", res.error || "Error al guardar la configuración");
     }
@@ -147,7 +150,7 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
 
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={() => handleSubmit()}
           disabled={isSubmitting}
           className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all text-sm shrink-0 active:scale-95 disabled:opacity-50 cursor-pointer"
         >
@@ -156,7 +159,7 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
           ) : (
             <Check className="w-4 h-4 text-[#F472A8]" />
           )}
-          <span>Guardar Cambios</span>
+          <span>Guardar Configuración</span>
         </button>
       </div>
 
@@ -634,8 +637,25 @@ export function SettingsView({ initialSettings }: SettingsViewProps) {
                 </div>
               </div>
 
+              {/* Botón directo de Guardar Paleta */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleSubmit()}
+                  disabled={isSubmitting}
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-[#6D4BB8] to-[#5837A3] hover:from-[#5837A3] hover:to-[#432785] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 text-[#F472A8]" />
+                  )}
+                  <span>Guardar y Aplicar Paleta Ahora</span>
+                </button>
+              </div>
+
               <p className="text-[11px] text-[#7A7590] text-center italic">
-                Cualquier cambio de paleta se refleja aquí al instante y se aplicará a toda la web al guardar.
+                Cualquier cambio se reflejará de inmediato en toda la tienda (cabecera, botones, insignias, textos y enlaces).
               </p>
             </div>
           </div>

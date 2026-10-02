@@ -8,6 +8,7 @@ import { SearchBar } from "./SearchBar";
 import { MobileCategoryDrawer } from "./MobileCategoryDrawer";
 import { useCartStore } from "@/store/useCartStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
+import { isColorDark } from "@/lib/theme-palettes";
 
 interface HeaderProps {
   logoUrl?: string;
@@ -19,6 +20,8 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
 
+  const isDark = isColorDark(headerBg);
+
   // Zustand stores
   const cartItemsCount = useCartStore((state) => state.getTotalItems());
   const hasCartHydrated = useCartStore((state) => state.hasHydrated);
@@ -28,8 +31,16 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
   return (
     <>
       <header
-        className="sticky top-0 z-40 backdrop-blur-md border-b border-[#F0E8F2] shadow-xs transition-all"
-        style={{ backgroundColor: headerBg ? `${headerBg}F5` : "rgba(255, 251, 247, 0.95)" }}
+        className={`sticky top-0 z-40 backdrop-blur-md border-b shadow-xs transition-all ${
+          isDark ? "border-white/10" : "border-[#F0E8F2]"
+        }`}
+        style={{
+          backgroundColor: headerBg
+            ? isDark
+              ? headerBg
+              : `${headerBg}F5`
+            : "rgba(255, 251, 247, 0.95)",
+        }}
       >
         {/* Main Header Container */}
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,7 +50,11 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsDrawerOpen(true)}
-                className="lg:hidden p-2 text-[#6D4BB8] hover:bg-[#FCE4EF]/60 rounded-xl transition-colors"
+                className={`lg:hidden p-2 rounded-xl transition-colors cursor-pointer ${
+                  isDark
+                    ? "text-white hover:bg-white/10"
+                    : "text-[#6D4BB8] hover:bg-[#FCE4EF]/60"
+                }`}
                 aria-label="Abrir menú de categorías"
               >
                 <Menu className="w-6 h-6" strokeWidth={1.8} />
@@ -61,7 +76,9 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
                   type="button"
                   onClick={() => setIsAccountOpen(!isAccountOpen)}
                   onBlur={() => setTimeout(() => setIsAccountOpen(false), 200)}
-                  className="flex flex-col items-center justify-center group py-1 px-2 rounded-xl hover:bg-[#FCE4EF]/40 transition-colors cursor-pointer"
+                  className={`flex flex-col items-center justify-center group py-1 px-2 rounded-xl transition-colors cursor-pointer ${
+                    isDark ? "hover:bg-white/10" : "hover:bg-[#FCE4EF]/40"
+                  }`}
                   aria-expanded={isAccountOpen}
                   aria-label="Mi cuenta"
                 >
@@ -69,7 +86,13 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
                     <User className="w-5 h-5" strokeWidth={1.5} />
                     <ChevronDown className="w-3 h-3 -mr-1 ml-0.5 opacity-70 group-hover:opacity-100 transition-opacity" />
                   </div>
-                  <span className="text-[11px] sm:text-xs font-medium text-[#2E2A3B] group-hover:text-[#6D4BB8] transition-colors mt-0.5">
+                  <span
+                    className={`text-[11px] sm:text-xs font-medium transition-colors mt-0.5 ${
+                      isDark
+                        ? "text-white/90 group-hover:text-white"
+                        : "text-[#2E2A3B] group-hover:text-[#6D4BB8]"
+                    }`}
+                  >
                     Mi cuenta
                   </span>
                 </button>
@@ -95,7 +118,9 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
               {/* Favoritos */}
               <Link
                 href="/favoritos"
-                className="relative flex flex-col items-center justify-center group py-1 px-2 rounded-xl hover:bg-[#FCE4EF]/40 transition-colors"
+                className={`relative flex flex-col items-center justify-center group py-1 px-2 rounded-xl transition-colors ${
+                  isDark ? "hover:bg-white/10" : "hover:bg-[#FCE4EF]/40"
+                }`}
                 aria-label="Ver productos favoritos"
               >
                 <div className="relative text-[#6D4BB8] group-hover:text-[#F472A8] transition-colors">
@@ -106,7 +131,13 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] sm:text-xs font-medium text-[#2E2A3B] group-hover:text-[#6D4BB8] transition-colors mt-0.5">
+                <span
+                  className={`text-[11px] sm:text-xs font-medium transition-colors mt-0.5 ${
+                    isDark
+                      ? "text-white/90 group-hover:text-white"
+                      : "text-[#2E2A3B] group-hover:text-[#6D4BB8]"
+                  }`}
+                >
                   Favoritos
                 </span>
               </Link>
@@ -114,7 +145,9 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
               {/* Carrito */}
               <Link
                 href="/carrito"
-                className="relative flex flex-col items-center justify-center group py-1 px-2 rounded-xl hover:bg-[#FCE4EF]/40 transition-colors"
+                className={`relative flex flex-col items-center justify-center group py-1 px-2 rounded-xl transition-colors ${
+                  isDark ? "hover:bg-white/10" : "hover:bg-[#FCE4EF]/40"
+                }`}
                 aria-label="Ver carrito de compras"
               >
                 <div className="relative text-[#6D4BB8] group-hover:text-[#F472A8] transition-colors">
@@ -125,7 +158,13 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] sm:text-xs font-medium text-[#2E2A3B] group-hover:text-[#6D4BB8] transition-colors mt-0.5">
+                <span
+                  className={`text-[11px] sm:text-xs font-medium transition-colors mt-0.5 ${
+                    isDark
+                      ? "text-white/90 group-hover:text-white"
+                      : "text-[#2E2A3B] group-hover:text-[#6D4BB8]"
+                  }`}
+                >
                   Carrito
                 </span>
               </Link>

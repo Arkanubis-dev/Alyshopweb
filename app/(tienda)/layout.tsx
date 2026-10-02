@@ -5,6 +5,9 @@ import { MobileBottomNav } from "@/components/tienda/MobileBottomNav";
 import { WhatsAppFloatingButton } from "@/components/tienda/WhatsAppFloatingButton";
 import { getAdminSettingsAction } from "@/app/actions/settings";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function TiendaLayout({
   children,
 }: {

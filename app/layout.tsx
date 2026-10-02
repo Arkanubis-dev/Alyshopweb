@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Pacifico, Nunito } from "next/font/google";
 import { getAdminSettingsAction } from "@/app/actions/settings";
+import { generateThemeCSS } from "@/lib/theme-palettes";
 import "./globals.css";
 
 const pacifico = Pacifico({
@@ -93,16 +94,16 @@ export const metadata: Metadata = {
   },
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const settings = await getAdminSettingsAction();
-  const primaryColor = settings?.primary_color || "#6D4BB8";
-  const secondaryColor = settings?.secondary_color || "#F472A8";
-  const headerBgColor = settings?.header_bg_color || "#FFFFFF";
-  const textColor = settings?.text_color || "#2E2A3B";
+  const themeCSS = generateThemeCSS(settings);
 
   const jsonLdOrg = {
     "@context": "https://schema.org",
@@ -135,17 +136,9 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }}
         />
         <style
+          id="dynamic-theme-styles"
           dangerouslySetInnerHTML={{
-            __html: `
-              :root {
-                --color-primary: ${primaryColor};
-                --color-secondary: ${secondaryColor};
-                --color-header-bg: ${headerBgColor};
-                --color-site-text: ${textColor};
-                --color-aly-purple: ${primaryColor};
-                --color-aly-pink: ${secondaryColor};
-              }
-            `,
+            __html: themeCSS,
           }}
         />
       </head>
