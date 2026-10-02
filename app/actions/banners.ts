@@ -58,24 +58,64 @@ export async function saveBannerAction(bannerData: Partial<BannerSlide>): Promis
 }> {
   try {
     const isNew = !bannerData.id || bannerData.id.startsWith("temp-");
-    const bannerId = isNew ? `banner-${Date.now()}` : bannerData.id!;
+    let bannerId = isNew ? `banner-${Date.now()}` : bannerData.id!;
 
     const supabase = createAdminClient();
+
+    // Validar límite estricto de máximo 5 banners
+    if (isNew) {
+      if (supabase) {
+        const { count, error: countErr } = await supabase
+          .from("banners")
+          .select("*", { count: "exact", head: true });
+
+        if (!countErr && typeof count === "number" && count >= 5) {
+          return {
+            success: false,
+            error: "Límite alcanzado: solo puedes tener un máximo de 5 banners. Edita o elimina uno existente.",
+          };
+        }
+      } else if (adminBannersStore.length >= 5) {
+        return {
+          success: false,
+          error: "Límite alcanzado: solo puedes tener un máximo de 5 banners. Edita o elimina uno existente.",
+        };
+      }
+    }
+
     if (supabase) {
       const payload = {
         title: bannerData.title,
-        subtitle: bannerData.subtitle,
+        subtitle: bannerData.subtitle || "",
         cta_text: bannerData.cta_text || "¡Descubre más!",
         link: bannerData.link || "/#productos",
-        image_url: bannerData.image_url,
+        image_url: bannerData.image_url || "",
         sort_order: bannerData.sort_order || 1,
         is_active: bannerData.is_active ?? true,
       };
 
       if (isNew) {
-        await supabase.from("banners").insert(payload);
+        const { data: inserted, error: insertError } = await supabase
+          .from("banners")
+          .insert(payload)
+          .select()
+          .single();
+
+        if (insertError) {
+          throw new Error(insertError.message);
+        }
+        if (inserted?.id) {
+          bannerId = inserted.id;
+        }
       } else {
-        await supabase.from("banners").update(payload).eq("id", bannerId);
+        const { error: updateError } = await supabase
+          .from("banners")
+          .update(payload)
+          .eq("id", bannerId);
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
       }
     }
 
@@ -96,6 +136,12 @@ export async function saveBannerAction(bannerData: Partial<BannerSlide>): Promis
     if (idx >= 0) {
       adminBannersStore[idx] = newBanner;
     } else {
+      if (adminBannersStore.length >= 5) {
+        return {
+          success: false,
+          error: "Límite alcanzado: solo puedes tener un máximo de 5 banners. Edita o elimina uno existente.",
+        };
+      }
       adminBannersStore.push(newBanner);
     }
 

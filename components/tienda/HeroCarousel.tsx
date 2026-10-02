@@ -86,6 +86,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                 alt="Variedad de productos alyshop"
                 fill
                 priority
+                unoptimized={currentSlide.image_url?.startsWith("data:")}
                 className="object-cover group-hover:scale-105 transition-transform duration-500"
                 sizes="(max-width: 1024px) 40vw, 350px"
               />

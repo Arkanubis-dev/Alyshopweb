@@ -19,6 +19,7 @@ import {
   X,
   AlertTriangle,
   Loader2,
+  Upload,
 } from "lucide-react";
 import { BannerSlide } from "@/types";
 import {
@@ -26,6 +27,9 @@ import {
   deleteBannerAction,
   toggleBannerStatusAction,
 } from "@/app/actions/banners";
+import { uploadProductImageAction } from "@/app/actions/products";
+
+const MAX_BANNERS = 5;
 
 interface BannersViewProps {
   initialBanners: BannerSlide[];
@@ -37,6 +41,8 @@ export function BannersView({ initialBanners }: BannersViewProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState<BannerSlide | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Form state
@@ -56,7 +62,69 @@ export function BannersView({ initialBanners }: BannersViewProps) {
     setTimeout(() => setStatusMessage(null), 3500);
   };
 
+  const handleUploadBannerImage = async (file: File) => {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      notify("error", "Por favor selecciona un archivo de imagen válido (PNG, JPG, WebP o SVG).");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      notify("error", "El tamaño de la imagen no debe superar los 5MB.");
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+      const res = await uploadProductImageAction(uploadFormData);
+      if (res.success && res.url) {
+        setFormData((prev) => ({ ...prev, image_url: res.url }));
+        notify("success", "Imagen del banner cargada con éxito");
+      } else {
+        notify("error", res.error || "Error al subir la imagen");
+      }
+    } catch (err: any) {
+      notify("error", err.message || "Error al procesar la imagen");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleUploadBannerImage(file);
+    }
+    if (e.target) e.target.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleUploadBannerImage(file);
+    }
+  };
+
   const handleOpenCreate = () => {
+    if (banners.length >= MAX_BANNERS) {
+      notify("error", `Has alcanzado el límite máximo de ${MAX_BANNERS} banners. Edita o elimina uno existente.`);
+      return;
+    }
+
     setFormData({
       title: "",
       subtitle: "",
@@ -64,7 +132,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
       link: "/#productos",
       image_url: "",
       bg_gradient: "from-[#FDE8DD] via-[#FCE4EF] to-[#FFFBF7]",
-      sort_order: (banners.length + 1),
+      sort_order: banners.length + 1,
       is_active: true,
     });
     setEditingBanner(null);
@@ -130,6 +198,16 @@ export function BannersView({ initialBanners }: BannersViewProps) {
       return;
     }
 
+    if (!editingBanner && banners.length >= MAX_BANNERS) {
+      notify("error", `Has alcanzado el límite máximo de ${MAX_BANNERS} banners. Edita o elimina uno existente.`);
+      return;
+    }
+
+    if (isUploadingImage) {
+      notify("error", "Por favor espera a que termine de subirse la imagen.");
+      return;
+    }
+
     setIsSubmitting(true);
     const res = await saveBannerAction(formData);
     setIsSubmitting(false);
@@ -152,6 +230,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
   };
 
   const activeCount = banners.filter((b) => b.is_active).length;
+  const isLimitReached = banners.length >= MAX_BANNERS;
 
   return (
     <div className="space-y-6">
@@ -183,19 +262,55 @@ export function BannersView({ initialBanners }: BannersViewProps) {
           <h1 className="text-2xl font-black text-stone-900 tracking-tight">
             Banners de la Tienda
           </h1>
-          <p className="text-sm text-stone-500 mt-1">
-            Administra los carruseles promocionales de la cabecera. ({activeCount} activos de {banners.length})
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <p className="text-sm text-stone-500">
+              Administra los carruseles promocionales de la cabecera. ({activeCount} activos de {banners.length})
+            </p>
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border transition-colors ${
+                isLimitReached
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : "bg-primary/10 text-primary border-primary/20"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Capacidad: {banners.length} / {MAX_BANNERS} Banners
+              {isLimitReached && " (Límite alcanzado)"}
+            </span>
+          </div>
         </div>
 
         <button
+          type="button"
           onClick={handleOpenCreate}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl shadow-sm transition-all text-sm shrink-0 active:scale-95"
+          disabled={isLimitReached}
+          title={isLimitReached ? `Límite máximo de ${MAX_BANNERS} banners alcanzado` : "Crear nuevo banner"}
+          className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 font-bold rounded-xl shadow-sm transition-all text-sm shrink-0 ${
+            isLimitReached
+              ? "bg-stone-200 text-stone-400 cursor-not-allowed border border-stone-300 shadow-none"
+              : "bg-primary hover:bg-primary-hover text-white active:scale-95 cursor-pointer"
+          }`}
         >
           <Plus className="w-4 h-4" />
           <span>Nuevo Banner</span>
+          <span className="text-xs opacity-75">({banners.length}/{MAX_BANNERS})</span>
         </button>
       </div>
+
+      {/* Banner limit banner if reached */}
+      {isLimitReached && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-3 text-xs text-amber-900">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="font-bold text-amber-900">Límite máximo de 5 banners alcanzado</p>
+              <p className="text-amber-800 text-[11px] mt-0.5">
+                Tienes el cupo máximo de 5 banners configurados. Para añadir un banner diferente, debes editar o eliminar alguno de los existentes.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Banners List / Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -231,6 +346,7 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                     src={banner.image_url}
                     alt={banner.title}
                     fill
+                    unoptimized={banner.image_url?.startsWith("data:")}
                     className="object-contain"
                     sizes="120px"
                   />
@@ -405,20 +521,141 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                 </div>
               </div>
 
+              {/* Gradiente de fondo del banner */}
               <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  URL de la Imagen
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1.5">
+                  Estilo de Fondo
                 </label>
-                <input
-                  type="url"
-                  value={formData.image_url || ""}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-                />
-                <p className="text-[11px] text-stone-400 mt-1">
-                  Recomendado: Imagen con fondo transparente o estilo producto en PNG/WebP.
-                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { name: "Rosa Alyshop", class: "from-[#FDE8DD] via-[#FCE4EF] to-[#FFFBF7]" },
+                    { name: "Lavanda & Cielo", class: "from-[#EEEAFB] via-[#E0EEFB] to-[#FFFBF7]" },
+                    { name: "Dorado Cálido", class: "from-[#FFF1CC] via-[#DDF3EC] to-[#FFFBF7]" },
+                    { name: "Orquídea Suave", class: "from-[#FCE4EF] via-[#EEEAFB] to-[#FAF5FB]" },
+                    { name: "Violeta Alyshop", class: "from-[#FAF5FB] via-[#F3E8FF] to-[#EDE9FE]" },
+                  ].map((grad) => (
+                    <button
+                      key={grad.class}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, bg_gradient: grad.class })}
+                      className={`p-2 rounded-xl border flex items-center gap-2 text-left transition-all cursor-pointer ${
+                        formData.bg_gradient === grad.class
+                          ? "border-primary ring-2 ring-primary/20 bg-primary/5 shadow-2xs"
+                          : "border-stone-200 hover:border-stone-300 bg-white"
+                      }`}
+                    >
+                      <span className={`w-4 h-4 rounded-md bg-gradient-to-r ${grad.class} border border-black/10 shrink-0`} />
+                      <span className="text-[11px] font-semibold text-stone-700 truncate">{grad.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subida directa de Imagen (sin URL ni enlaces) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-stone-700 uppercase">
+                    Imagen del Banner
+                  </label>
+                  {formData.image_url ? (
+                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> Imagen lista
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-stone-400">
+                      Sube una imagen desde tu dispositivo
+                    </span>
+                  )}
+                </div>
+
+                {formData.image_url ? (
+                  <div className="relative rounded-2xl border border-stone-200 bg-stone-50 overflow-hidden p-3 space-y-3">
+                    {/* Previa en tiempo real con el fondo del banner */}
+                    <div className={`relative h-44 w-full rounded-xl bg-gradient-to-r ${formData.bg_gradient || "from-[#FDE8DD] via-[#FCE4EF] to-[#FFFBF7]"} flex items-center justify-center p-3 border border-stone-200/50 overflow-hidden shadow-inner`}>
+                      <img
+                        src={formData.image_url}
+                        alt="Previa del banner"
+                        className="max-h-full max-w-full object-contain drop-shadow-md"
+                      />
+                      <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/80 text-stone-700 backdrop-blur-xs shadow-2xs">
+                        Vista previa con fondo
+                      </div>
+                    </div>
+
+                    {/* Acciones para cambiar o quitar */}
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-200 hover:border-primary text-xs font-bold text-stone-700 hover:text-primary bg-white hover:bg-stone-50 transition-colors shadow-2xs">
+                        {isUploadingImage ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5 text-primary" />
+                        )}
+                        <span>{isUploadingImage ? "Subiendo..." : "Cambiar imagen"}</span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/jpg,image/svg+xml"
+                          disabled={isUploadingImage}
+                          onChange={onFileInputChange}
+                          className="hidden"
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, image_url: "" }))}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Quitar imagen</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
+                      dragOver
+                        ? "border-primary bg-primary/5 scale-[1.01]"
+                        : "border-stone-300 hover:border-primary/60 bg-stone-50/70 hover:bg-primary/5"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/jpg,image/svg+xml"
+                      disabled={isUploadingImage}
+                      onChange={onFileInputChange}
+                      className="hidden"
+                    />
+
+                    {isUploadingImage ? (
+                      <div className="flex flex-col items-center gap-2 py-4">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                        <p className="text-xs font-bold text-primary">Subiendo imagen al servidor...</p>
+                        <p className="text-[11px] text-stone-400">Por favor espera un momento</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-center py-2">
+                        <div className="w-12 h-12 rounded-2xl bg-white border border-stone-200 shadow-2xs flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-stone-800">
+                            Haz clic para seleccionar o arrastra una imagen aquí
+                          </p>
+                          <p className="text-[11px] text-stone-500 mt-0.5">
+                            Recomendado: PNG con fondo transparente, JPG o WebP (máx. 5MB)
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary px-3.5 py-1.5 bg-white rounded-full border border-primary/20 shadow-2xs mt-1 hover:bg-primary/5">
+                          <Upload className="w-3.5 h-3.5" />
+                          Subir imagen desde tu equipo
+                        </span>
+                      </div>
+                    )}
+                  </label>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -451,6 +688,15 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                 </div>
               </div>
 
+              {!editingBanner && isLimitReached && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                  <span>
+                    Has alcanzado el límite de 5 banners. No puedes agregar más a menos que elimines uno existente.
+                  </span>
+                </div>
+              )}
+
               <div className="pt-4 border-t border-stone-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -461,8 +707,8 @@ export function BannersView({ initialBanners }: BannersViewProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 px-5 py-2 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl text-sm shadow-sm transition-all disabled:opacity-50"
+                  disabled={isSubmitting || isUploadingImage || (!editingBanner && isLimitReached)}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl text-sm shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Guardar Banner</span>
