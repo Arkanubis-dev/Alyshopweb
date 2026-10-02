@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Image from "next/image";
 import * as XLSX from "xlsx";
+import { AdminPagination, PageSizeOption } from "./AdminPagination";
 import {
   Plus,
   Search,
@@ -59,6 +60,8 @@ export function ProductManagementView({
   const [selectedCategory, setSelectedCategory] = useState("todas");
   const [selectedSubcategory, setSelectedSubcategory] = useState("todas");
   const [stockFilter, setStockFilter] = useState("todos");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(10);
 
   // Drawer / Form state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -209,16 +212,36 @@ export function ProductManagementView({
     });
   }, [products, selectedCategory, selectedSubcategory, stockFilter, search]);
 
-  // Bulk Selection Handlers
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, selectedSubcategory, stockFilter, search]);
+
+  // Paginated products slice
+  const paginatedProducts = useMemo(() => {
+    if (pageSize === "all") return filteredProducts;
+    const start = (currentPage - 1) * (pageSize as number);
+    return filteredProducts.slice(start, start + (pageSize as number));
+  }, [filteredProducts, currentPage, pageSize]);
+
+  // Bulk Selection Handlers (preserves multi-selection across pages)
+  const isCurrentPageAllSelected =
+    paginatedProducts.length > 0 &&
+    paginatedProducts.every((p) => selectedProductIds.includes(p.id));
+
   const isAllSelected =
     filteredProducts.length > 0 &&
     filteredProducts.every((p) => selectedProductIds.includes(p.id));
 
   const handleToggleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedProductIds([]);
+    if (isCurrentPageAllSelected) {
+      // Deselect all items on current page (preserves items selected on other pages)
+      const pageIds = new Set(paginatedProducts.map((p) => p.id));
+      setSelectedProductIds((prev) => prev.filter((id) => !pageIds.has(id)));
     } else {
-      setSelectedProductIds(filteredProducts.map((p) => p.id));
+      // Select all items on current page (accumulates with other pages)
+      const pageIds = paginatedProducts.map((p) => p.id);
+      setSelectedProductIds((prev) => Array.from(new Set([...prev, ...pageIds])));
     }
   };
 
@@ -839,11 +862,11 @@ export function ProductManagementView({
                 <th className="py-3 px-3 text-center w-10">
                   <input
                     type="checkbox"
-                    checked={isAllSelected}
+                    checked={isCurrentPageAllSelected}
                     onChange={handleToggleSelectAll}
                     aria-label="Seleccionar todos"
                     className="w-4 h-4 rounded text-[#6D4BB8] accent-[#6D4BB8] cursor-pointer"
-                    title={isAllSelected ? "Deseleccionar todos" : "Seleccionar todos"}
+                    title={isCurrentPageAllSelected ? "Deseleccionar los de esta página" : "Seleccionar los de esta página"}
                   />
                 </th>
                 <th className="py-3 px-4 text-center w-24">Orden</th>
@@ -857,21 +880,22 @@ export function ProductManagementView({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F7F2F9]">
-              {filteredProducts.map((p, index) => {
+              {paginatedProducts.map((p, index) => {
+                const globalIndex = pageSize === "all" ? index : (currentPage - 1) * (pageSize as number) + index;
                 const isOutOfStock = p.stock <= 0;
                 const isLowStock = !isOutOfStock && p.stock <= p.low_stock_threshold;
                 const primaryImg = p.images[0]?.url || "/placeholder.png";
-                const isDragging = draggedIndex === index;
-                const isDropTarget = dragOverIndex === index;
+                const isDragging = draggedIndex === globalIndex;
+                const isDropTarget = dragOverIndex === globalIndex;
                 const isSelected = selectedProductIds.includes(p.id);
 
                 return (
                   <tr
                     key={p.id}
                     draggable={canDragReorder}
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDrop={(e) => handleDrop(e, index)}
+                    onDragStart={(e) => handleDragStart(e, globalIndex)}
+                    onDragOver={(e) => handleDragOver(e, globalIndex)}
+                    onDrop={(e) => handleDrop(e, globalIndex)}
                     onDragEnd={handleDragEnd}
                     className={`transition-all select-none ${
                       isSelected
@@ -908,16 +932,16 @@ export function ProductManagementView({
                           <GripVertical className="w-4 h-4" />
                         </div>
                         <span className="font-bold text-[#6D4BB8] min-w-6 text-center text-xs bg-[#EEEAFB] px-2 py-0.5 rounded-full">
-                          #{index + 1}
+                          #{globalIndex + 1}
                         </span>
                         <div className="flex flex-col gap-0.5">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleMoveUp(index);
+                              handleMoveUp(globalIndex);
                             }}
-                            disabled={!canDragReorder || index === 0}
+                            disabled={!canDragReorder || globalIndex === 0}
                             className="p-0.5 text-[#7A7590] hover:text-[#6D4BB8] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                             title="Subir posición"
                           >
@@ -927,9 +951,9 @@ export function ProductManagementView({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleMoveDown(index);
+                              handleMoveDown(globalIndex);
                             }}
-                            disabled={!canDragReorder || index === filteredProducts.length - 1}
+                            disabled={!canDragReorder || globalIndex === filteredProducts.length - 1}
                             className="p-0.5 text-[#7A7590] hover:text-[#6D4BB8] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                             title="Bajar posición"
                           >
@@ -1080,6 +1104,20 @@ export function ProductManagementView({
             <p className="text-sm font-semibold">No se encontraron productos con estos filtros</p>
           </div>
         )}
+
+        {/* Pagination Controls */}
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={filteredProducts.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="productos"
+          selectedCount={selectedProductIds.length}
+        />
       </div>
 
       {/* ================================================================= */}
@@ -1095,6 +1133,16 @@ export function ProductManagementView({
               {selectedProductIds.length === 1 ? "seleccionado" : "seleccionados"}
             </span>
           </div>
+
+          {selectedProductIds.length < filteredProducts.length && (
+            <button
+              type="button"
+              onClick={() => setSelectedProductIds(filteredProducts.map((p) => p.id))}
+              className="text-xs text-[#6D4BB8] hover:text-[#5837A3] font-bold underline cursor-pointer pr-1"
+            >
+              Seleccionar todos ({filteredProducts.length})
+            </button>
+          )}
 
           {/* Activar */}
           <button

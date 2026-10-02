@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { AdminPagination, PageSizeOption } from "./AdminPagination";
 import {
   Plus,
   Edit2,
@@ -77,6 +78,15 @@ export function CategoryManagementView({
   products,
 }: CategoryManagementViewProps) {
   const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(10);
+
+  const paginatedCategories = useMemo(() => {
+    if (pageSize === "all") return categories;
+    const start = (currentPage - 1) * (pageSize as number);
+    return categories.slice(start, start + (pageSize as number));
+  }, [categories, currentPage, pageSize]);
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -421,20 +431,21 @@ export function CategoryManagementView({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F7F2F9]">
-              {categories.map((cat, index) => {
+              {paginatedCategories.map((cat, index) => {
+                const globalIndex = pageSize === "all" ? index : (currentPage - 1) * (pageSize as number) + index;
                 const iconObj = AVAILABLE_ICONS.find((i) => i.name === cat.icon) || AVAILABLE_ICONS[0];
                 const IconComponent = iconObj.component;
                 const count = getProductsCountForCategory(cat.id);
-                const isDragging = draggedIndex === index;
-                const isDropTarget = dragOverIndex === index;
+                const isDragging = draggedIndex === globalIndex;
+                const isDropTarget = dragOverIndex === globalIndex;
 
                 return (
                   <tr
                     key={cat.id}
                     draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDrop={(e) => handleDrop(e, index)}
+                    onDragStart={(e) => handleDragStart(e, globalIndex)}
+                    onDragOver={(e) => handleDragOver(e, globalIndex)}
+                    onDrop={(e) => handleDrop(e, globalIndex)}
                     onDragEnd={handleDragEnd}
                     className={`transition-all select-none ${
                       isDragging
@@ -454,16 +465,16 @@ export function CategoryManagementView({
                           <GripVertical className="w-4 h-4" />
                         </div>
                         <span className="font-bold text-[#6D4BB8] min-w-6 text-center text-xs bg-[#EEEAFB] px-2 py-0.5 rounded-full">
-                          #{index + 1}
+                          #{globalIndex + 1}
                         </span>
                         <div className="flex flex-col gap-0.5">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleMoveUp(index);
+                              handleMoveUp(globalIndex);
                             }}
-                            disabled={index === 0}
+                            disabled={globalIndex === 0}
                             className="p-0.5 text-[#7A7590] hover:text-[#6D4BB8] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                             title="Subir posición"
                           >
@@ -473,9 +484,9 @@ export function CategoryManagementView({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleMoveDown(index);
+                              handleMoveDown(globalIndex);
                             }}
-                            disabled={index === categories.length - 1}
+                            disabled={globalIndex === categories.length - 1}
                             className="p-0.5 text-[#7A7590] hover:text-[#6D4BB8] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                             title="Bajar posición"
                           >
@@ -576,6 +587,19 @@ export function CategoryManagementView({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={categories.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="categorías"
+        />
       </div>
 
       {/* ================================================================= */}

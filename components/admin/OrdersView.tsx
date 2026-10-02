@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { AdminPagination, PageSizeOption } from "./AdminPagination";
 import {
   ShoppingBag,
   Search,
@@ -120,6 +121,20 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
     }
     return true;
   });
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  const paginatedOrders = useMemo(() => {
+    if (pageSize === "all") return filteredOrders;
+    const start = (currentPage - 1) * (pageSize as number);
+    return filteredOrders.slice(start, start + (pageSize as number));
+  }, [filteredOrders, currentPage, pageSize]);
 
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
@@ -590,7 +605,7 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F7F2F9]">
-              {filteredOrders.map((order) => {
+              {paginatedOrders.map((order) => {
                 const badge = getStatusBadge(order.status);
                 const BadgeIcon = badge.icon;
 
@@ -682,6 +697,19 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
             <p className="text-sm font-semibold">No se encontraron pedidos con este filtro</p>
           </div>
         )}
+
+        {/* Pagination Controls */}
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={filteredOrders.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="pedidos"
+        />
       </div>
 
       {/* ================================================================= */}

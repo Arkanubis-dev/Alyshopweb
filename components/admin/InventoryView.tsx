@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import { AdminPagination, PageSizeOption } from "./AdminPagination";
 import {
   Boxes,
   Minus,
@@ -63,6 +64,30 @@ export function InventoryView({
     }
     return true;
   });
+
+  // Pagination State for Stock Tab
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(10);
+
+  // Pagination State for Movements Tab
+  const [currentMovementsPage, setCurrentMovementsPage] = useState(1);
+  const [movementsPageSize, setMovementsPageSize] = useState<PageSizeOption>(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterType]);
+
+  const paginatedProducts = useMemo(() => {
+    if (pageSize === "all") return filteredProducts;
+    const start = (currentPage - 1) * (pageSize as number);
+    return filteredProducts.slice(start, start + (pageSize as number));
+  }, [filteredProducts, currentPage, pageSize]);
+
+  const paginatedMovements = useMemo(() => {
+    if (movementsPageSize === "all") return movements;
+    const start = (currentMovementsPage - 1) * (movementsPageSize as number);
+    return movements.slice(start, start + (movementsPageSize as number));
+  }, [movements, currentMovementsPage, movementsPageSize]);
 
   // Fast inline stock adjustment (+ / -)
   const handleQuickAdjust = async (product: Product, delta: number) => {
@@ -286,7 +311,7 @@ export function InventoryView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F7F2F9]">
-                  {filteredProducts.map((p) => {
+                  {paginatedProducts.map((p) => {
                     const isOutOfStock = p.stock <= 0;
                     const isLowStock = !isOutOfStock && p.stock <= p.low_stock_threshold;
 
@@ -388,6 +413,19 @@ export function InventoryView({
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination for Stock */}
+            <AdminPagination
+              currentPage={currentPage}
+              totalItems={filteredProducts.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+              itemLabel="productos en stock"
+            />
           </div>
         </div>
       ) : (
@@ -414,7 +452,7 @@ export function InventoryView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F7F2F9]">
-                {movements.map((m) => {
+                {paginatedMovements.map((m) => {
                   const typeStyles = {
                     entrada: "bg-emerald-50 text-emerald-800 border-emerald-200",
                     salida: "bg-amber-50 text-amber-800 border-amber-200",
@@ -454,6 +492,19 @@ export function InventoryView({
               </tbody>
             </table>
           </div>
+
+          {/* Pagination for Movements */}
+          <AdminPagination
+            currentPage={currentMovementsPage}
+            totalItems={movements.length}
+            pageSize={movementsPageSize}
+            onPageChange={setCurrentMovementsPage}
+            onPageSizeChange={(newSize) => {
+              setMovementsPageSize(newSize);
+              setCurrentMovementsPage(1);
+            }}
+            itemLabel="movimientos de kárdex"
+          />
         </div>
       )}
 
