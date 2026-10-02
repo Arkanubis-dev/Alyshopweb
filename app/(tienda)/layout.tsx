@@ -3,6 +3,7 @@ import { BottomValueStrip } from "@/components/tienda/BottomValueStrip";
 import { Footer } from "@/components/tienda/Footer";
 import { MobileBottomNav } from "@/components/tienda/MobileBottomNav";
 import { WhatsAppFloatingButton } from "@/components/tienda/WhatsAppFloatingButton";
+import { CategoryWatermarks } from "@/components/tienda/CategoryWatermarks";
 import { getAdminSettingsAction } from "@/app/actions/settings";
 
 export const dynamic = "force-dynamic";
@@ -16,17 +17,23 @@ export default async function TiendaLayout({
   const settings = await getAdminSettingsAction();
 
   return (
-    <div className="tienda-root min-h-screen flex flex-col bg-[#FFFBF7]">
-      <Header
-        logoUrl={settings.logo_url}
-        storeName={settings.name}
-        headerBg={settings.header_bg_color}
-      />
-      <main className="flex-1">{children}</main>
-      <BottomValueStrip />
-      <Footer />
-      <WhatsAppFloatingButton />
-      <MobileBottomNav />
+    <div className="tienda-root min-h-screen flex flex-col bg-[#FFFBF7] relative">
+      {/* Marcas de agua semi-transparentes de iconos de categorías en el fondo */}
+      <CategoryWatermarks />
+
+      {/* Contenido de la tienda en capa relativa superior */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <Header
+          logoUrl={settings.logo_url}
+          storeName={settings.name}
+          headerBg={settings.header_bg_color}
+        />
+        <main className="flex-1">{children}</main>
+        <BottomValueStrip />
+        <Footer />
+        <WhatsAppFloatingButton />
+        <MobileBottomNav />
+      </div>
     </div>
   );
 }
