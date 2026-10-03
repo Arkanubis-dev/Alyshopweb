@@ -282,3 +282,49 @@ export async function reorderCategoriesAction(
   }
 }
 
+export async function bulkAddSubcategoryAction(
+  categoryIds: string[],
+  subcategoryName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const trimmed = subcategoryName.trim();
+    if (!trimmed || !categoryIds || categoryIds.length === 0) {
+      return { success: false, error: "Datos de subcategoría inválidos" };
+    }
+
+    const supabase = createAdminClient();
+    if (supabase) {
+      const subConfig = await getSubcategoriesConfig(supabase);
+      for (const catId of categoryIds) {
+        const currentSubs = subConfig.categories[catId] || [];
+        if (!currentSubs.includes(trimmed)) {
+          subConfig.categories[catId] = [...currentSubs, trimmed];
+        }
+      }
+      await supabase.from("settings").upsert({
+        key: "subcategories_config",
+        value: subConfig,
+      });
+    }
+
+    // Update fallback memory store
+    for (const catId of categoryIds) {
+      const cat = adminCategoriesStore.find((c) => c.id === catId);
+      if (cat) {
+        const subs = cat.subcategories || [];
+        if (!subs.includes(trimmed)) {
+          cat.subcategories = [...subs, trimmed];
+        }
+      }
+    }
+
+    revalidatePath("/admin/categorias");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in bulkAddSubcategoryAction:", err);
+    return { success: false, error: err.message || "Error al agregar subcategoría masiva" };
+  }
+}
+
+

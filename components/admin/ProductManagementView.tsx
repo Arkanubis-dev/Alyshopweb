@@ -34,6 +34,8 @@ import {
   AlertCircle,
   RefreshCw,
   Info,
+  FolderTree,
+  Tag,
 } from "lucide-react";
 import { Product, Category } from "@/types";
 import { formatCOP } from "@/lib/utils";
@@ -49,6 +51,7 @@ import {
   bulkDeleteProductsAction,
   bulkImportProductsAction,
   bulkAttachProductImagesAction,
+  bulkUpdateProductCategoryAction,
   BulkProductInput,
 } from "@/app/actions/products";
 import { findBestMatchingProduct, MatchConfidence } from "@/lib/product-matcher";
@@ -85,6 +88,14 @@ export function ProductManagementView({
   const [isBulkUpdatingStatus, setIsBulkUpdatingStatus] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isConfirmBulkDeleteOpen, setIsConfirmBulkDeleteOpen] = useState(false);
+
+  // Bulk Category & Subcategory Update state
+  const [isBulkCategoryModalOpen, setIsBulkCategoryModalOpen] = useState(false);
+  const [bulkTargetCategoryId, setBulkTargetCategoryId] = useState("");
+  const [bulkTargetSubcategory, setBulkTargetSubcategory] = useState("");
+  const [bulkCustomSubcategory, setBulkCustomSubcategory] = useState("");
+  const [bulkCategoryMode, setBulkCategoryMode] = useState<"both" | "category_only" | "subcategory_only">("both");
+  const [isUpdatingBulkCategory, setIsUpdatingBulkCategory] = useState(false);
 
   // Excel Bulk Import state
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
@@ -338,6 +349,64 @@ export function ProductManagementView({
       showToast("Error inesperado al eliminar productos", "error");
     } finally {
       setIsBulkDeleting(false);
+    }
+  };
+
+  const handleConfirmBulkUpdateCategory = async () => {
+    if (selectedProductIds.length === 0) return;
+    if (bulkCategoryMode !== "subcategory_only" && !bulkTargetCategoryId) {
+      showToast("Por favor selecciona una categoría de destino", "error");
+      return;
+    }
+
+    const finalSubcategory =
+      bulkTargetSubcategory === "__custom__"
+        ? bulkCustomSubcategory.trim()
+        : bulkTargetSubcategory;
+
+    try {
+      setIsUpdatingBulkCategory(true);
+      const updateCatOnly = bulkCategoryMode === "category_only";
+      const updateSubOnly = bulkCategoryMode === "subcategory_only";
+
+      const res = await bulkUpdateProductCategoryAction(
+        selectedProductIds,
+        bulkTargetCategoryId,
+        finalSubcategory,
+        updateCatOnly,
+        updateSubOnly
+      );
+
+      if (res.success && res.updatedProducts) {
+        showToast(
+          `¡Categoría/subcategoría de ${res.count} producto(s) actualizada correctamente!`
+        );
+
+        const updateMap = new Map(res.updatedProducts.map((p) => [p.id, p]));
+        setProducts((prev) =>
+          prev.map((p) => {
+            const upd = updateMap.get(p.id);
+            if (upd) {
+              return {
+                ...p,
+                category_id: upd.category_id,
+                category_name: upd.category_name,
+                subcategory: upd.subcategory,
+              };
+            }
+            return p;
+          })
+        );
+
+        setSelectedProductIds([]);
+        setIsBulkCategoryModalOpen(false);
+      } else {
+        showToast(res.error || "Error al actualizar categoría", "error");
+      }
+    } catch (err: any) {
+      showToast("Error inesperado: " + err.message, "error");
+    } finally {
+      setIsUpdatingBulkCategory(false);
     }
   };
 
@@ -1799,6 +1868,24 @@ export function ProductManagementView({
             <span>Desactivar</span>
           </button>
 
+          {/* Cambiar Categoría / Subcategoría */}
+          <button
+            type="button"
+            onClick={() => {
+              const firstSelected = products.find((p) => p.id === selectedProductIds[0]);
+              setBulkTargetCategoryId(firstSelected?.category_id || categories[0]?.id || "");
+              setBulkTargetSubcategory(firstSelected?.subcategory || "");
+              setBulkCustomSubcategory("");
+              setBulkCategoryMode("both");
+              setIsBulkCategoryModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#6D4BB8] border border-purple-200 text-xs font-bold transition-colors cursor-pointer"
+            title="Cambiar categoría o subcategoría a los productos seleccionados"
+          >
+            <FolderTree className="w-3.5 h-3.5 text-[#6D4BB8]" />
+            <span>Cambiar Categoría</span>
+          </button>
+
           {/* Eliminar Masivo */}
           <button
             type="button"
@@ -1975,6 +2062,249 @@ export function ProductManagementView({
                   <>
                     <Trash2 className="w-4 h-4" />
                     <span>Sí, Eliminar {selectedProductIds.length} Productos</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* BULK CATEGORY / SUBCATEGORY UPDATE MODAL */}
+      {/* ================================================================= */}
+      {isBulkCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-2xs"
+            onClick={() => !isUpdatingBulkCategory && setIsBulkCategoryModalOpen(false)}
+          />
+          <div className="relative w-full max-w-xl bg-white rounded-3xl p-6 space-y-5 shadow-2xl z-10 animate-in zoom-in-95 max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#F0E8F2]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 text-[#6D4BB8] flex items-center justify-center border border-purple-100 shrink-0">
+                  <FolderTree className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#2E2A3B]">
+                    Cambiar Categoría / Subcategoría en Lote
+                  </h3>
+                  <p className="text-xs text-[#7A7590]">
+                    Reasigna rápidamente los <strong className="text-[#6D4BB8]">{selectedProductIds.length} productos</strong> seleccionados.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isUpdatingBulkCategory}
+                onClick={() => setIsBulkCategoryModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Form Body */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {/* Mode Selection */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#2E2A3B] block">
+                  ¿Qué deseas modificar en los productos seleccionados?
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBulkCategoryMode("both")}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold text-center transition-all cursor-pointer ${
+                      bulkCategoryMode === "both"
+                        ? "bg-[#6D4BB8] text-white border-[#5837A3] shadow-2xs"
+                        : "bg-[#FAF5FB] text-[#7A7590] border-[#F0E8F2] hover:bg-gray-50"
+                    }`}
+                  >
+                    Categoría y Subcategoría
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkCategoryMode("category_only")}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold text-center transition-all cursor-pointer ${
+                      bulkCategoryMode === "category_only"
+                        ? "bg-[#6D4BB8] text-white border-[#5837A3] shadow-2xs"
+                        : "bg-[#FAF5FB] text-[#7A7590] border-[#F0E8F2] hover:bg-gray-50"
+                    }`}
+                  >
+                    Solo Categoría
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkCategoryMode("subcategory_only")}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold text-center transition-all cursor-pointer ${
+                      bulkCategoryMode === "subcategory_only"
+                        ? "bg-[#6D4BB8] text-white border-[#5837A3] shadow-2xs"
+                        : "bg-[#FAF5FB] text-[#7A7590] border-[#F0E8F2] hover:bg-gray-50"
+                    }`}
+                  >
+                    Solo Subcategoría
+                  </button>
+                </div>
+              </div>
+
+              {/* Destination Category */}
+              {bulkCategoryMode !== "subcategory_only" && (
+                <div className="space-y-1.5 p-3.5 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2]">
+                  <label className="text-xs font-bold text-[#2E2A3B] flex items-center justify-between">
+                    <span>Nueva Categoría de Destino *</span>
+                    <span className="text-[10px] text-[#6D4BB8] font-bold">Obligatorio</span>
+                  </label>
+                  <select
+                    value={bulkTargetCategoryId}
+                    onChange={(e) => {
+                      setBulkTargetCategoryId(e.target.value);
+                      setBulkTargetSubcategory("");
+                      setBulkCustomSubcategory("");
+                    }}
+                    className="w-full text-xs font-semibold p-2.5 rounded-xl bg-white border border-[#E0D4F0] focus:outline-none focus:border-[#6D4BB8] cursor-pointer"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Destination Subcategory */}
+              {bulkCategoryMode !== "category_only" && (
+                <div className="space-y-2 p-3.5 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2]">
+                  <label className="text-xs font-bold text-[#2E2A3B] flex items-center justify-between">
+                    <span>Nueva Subcategoría *</span>
+                    <span className="text-[10px] text-[#7A7590]">Opcional / Flexible</span>
+                  </label>
+                  {(() => {
+                    const catObj = categories.find((c) => c.id === bulkTargetCategoryId);
+                    const subList = catObj?.subcategories || [];
+
+                    return (
+                      <div className="space-y-2">
+                        <select
+                          value={bulkTargetSubcategory}
+                          onChange={(e) => setBulkTargetSubcategory(e.target.value)}
+                          className="w-full text-xs font-semibold p-2.5 rounded-xl bg-white border border-[#E0D4F0] focus:outline-none focus:border-[#6D4BB8] cursor-pointer"
+                        >
+                          <option value="">Sin subcategoría (General)</option>
+                          {subList.map((sub) => (
+                            <option key={sub} value={sub}>
+                              {sub}
+                            </option>
+                          ))}
+                          <option value="__custom__">+ Escribir nueva subcategoría personalizada...</option>
+                        </select>
+
+                        {bulkTargetSubcategory === "__custom__" && (
+                          <input
+                            type="text"
+                            value={bulkCustomSubcategory}
+                            onChange={(e) => setBulkCustomSubcategory(e.target.value)}
+                            placeholder="Escribe el nombre de la nueva subcategoría..."
+                            className="w-full text-xs p-2.5 rounded-xl bg-white border border-[#6D4BB8] focus:outline-none focus:ring-1 focus:ring-[#6D4BB8]"
+                            autoFocus
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Selected Products Preview */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#7A7590]">
+                  Productos que se modificarán ({selectedProductIds.length}):
+                </span>
+                <div className="max-h-40 overflow-y-auto border border-[#F0E8F2] rounded-2xl divide-y divide-[#F7F2F9]">
+                  {products
+                    .filter((p) => selectedProductIds.includes(p.id))
+                    .map((p) => {
+                      const currentCatName =
+                        p.category_name ||
+                        categories.find((c) => c.id === p.category_id)?.name ||
+                        "Sin categoría";
+                      const targetCatName =
+                        categories.find((c) => c.id === bulkTargetCategoryId)?.name ||
+                        currentCatName;
+
+                      const nextSub =
+                        bulkTargetSubcategory === "__custom__"
+                          ? bulkCustomSubcategory.trim()
+                          : bulkTargetSubcategory;
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="p-2.5 flex items-center justify-between gap-3 text-xs hover:bg-[#FAF5FB]/50"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={p.images[0]?.url || "/placeholder.png"}
+                              alt={p.name}
+                              className="w-7 h-7 rounded-lg object-cover border border-gray-200 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className="font-bold text-[#2E2A3B] truncate max-w-[200px] sm:max-w-xs">
+                                {p.name}
+                              </p>
+                              <p className="text-[10px] text-[#7A7590] truncate">
+                                {p.sku || "Sin SKU"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] text-[#7A7590] line-through block">
+                              {currentCatName} {p.subcategory ? `(${p.subcategory})` : ""}
+                            </span>
+                            <span className="text-[10px] font-bold text-[#6D4BB8] block">
+                              &rarr; {bulkCategoryMode === "subcategory_only" ? currentCatName : targetCatName}
+                              {bulkCategoryMode !== "category_only" && nextSub ? ` (${nextSub})` : ""}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#F0E8F2]">
+              <button
+                type="button"
+                disabled={isUpdatingBulkCategory}
+                onClick={() => setIsBulkCategoryModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-[#F0E8F2] text-xs font-bold text-[#7A7590] hover:bg-gray-50 cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  isUpdatingBulkCategory ||
+                  (bulkCategoryMode !== "subcategory_only" && !bulkTargetCategoryId)
+                }
+                onClick={handleConfirmBulkUpdateCategory}
+                className="px-5 py-2.5 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-extrabold flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {isUpdatingBulkCategory ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Guardando cambios...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Aplicar a {selectedProductIds.length} Productos</span>
                   </>
                 )}
               </button>

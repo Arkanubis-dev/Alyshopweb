@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Product } from "@/types";
 import { MOCK_PRODUCTS } from "@/lib/mock-data";
-import { getSubcategoriesConfig } from "./categories";
+import { getSubcategoriesConfig, getAllAdminCategories } from "./categories";
 
 // Fallback products in-memory store for local demo mode
 const globalForProducts = global as unknown as { adminProducts: Product[] };
@@ -446,6 +446,121 @@ export async function bulkDeleteProductsAction(
   } catch (err: any) {
     console.error("Error in bulkDeleteProductsAction:", err);
     return { success: false, count: 0, error: err.message || "Error al eliminar productos" };
+  }
+}
+
+export async function bulkUpdateProductCategoryAction(
+  productIds: string[],
+  newCategoryId: string,
+  newSubcategory?: string,
+  updateCategoryOnly: boolean = false,
+  updateSubcategoryOnly: boolean = false
+): Promise<{
+  success: boolean;
+  count: number;
+  error?: string;
+  updatedProducts?: Array<{
+    id: string;
+    category_id: string;
+    category_name: string;
+    subcategory: string;
+  }>;
+}> {
+  try {
+    if (!productIds || productIds.length === 0) {
+      return { success: true, count: 0, updatedProducts: [] };
+    }
+
+    const supabase = createAdminClient();
+    let catName = "";
+
+    if (newCategoryId && !updateSubcategoryOnly) {
+      const allCats = await getAllAdminCategories();
+      const found = allCats.find((c) => c.id === newCategoryId);
+      if (found) catName = found.name;
+    }
+
+    if (supabase) {
+      // 1. Update category_id in products table
+      if (!updateSubcategoryOnly && newCategoryId) {
+        const { error: prodErr } = await supabase
+          .from("products")
+          .update({ category_id: newCategoryId })
+          .in("id", productIds);
+        if (prodErr) throw prodErr;
+      }
+
+      // 2. Update subcategories_config in settings
+      if (!updateCategoryOnly && newSubcategory !== undefined) {
+        const subConfig = await getSubcategoriesConfig(supabase);
+        for (const id of productIds) {
+          if (newSubcategory && newSubcategory.trim()) {
+            subConfig.products[id] = newSubcategory.trim();
+          } else {
+            delete subConfig.products[id];
+          }
+        }
+        await supabase.from("settings").upsert({
+          key: "subcategories_config",
+          value: subConfig,
+        });
+      }
+    }
+
+    // 3. Update in-memory fallback store
+    const updatedProducts: Array<{
+      id: string;
+      category_id: string;
+      category_name: string;
+      subcategory: string;
+    }> = [];
+
+    for (let i = 0; i < adminProductsStore.length; i++) {
+      const p = adminProductsStore[i];
+      if (productIds.includes(p.id)) {
+        const updatedCatId = updateSubcategoryOnly ? p.category_id : newCategoryId;
+        const updatedCatName = updateSubcategoryOnly
+          ? (p.category_name || "")
+          : (catName || p.category_name || "");
+        const updatedSub =
+          !updateCategoryOnly && newSubcategory !== undefined
+            ? newSubcategory.trim()
+            : (p.subcategory || "");
+
+        adminProductsStore[i] = {
+          ...p,
+          category_id: updatedCatId,
+          category_name: updatedCatName,
+          subcategory: updatedSub,
+        };
+
+        updatedProducts.push({
+          id: p.id,
+          category_id: updatedCatId,
+          category_name: updatedCatName,
+          subcategory: updatedSub,
+        });
+      }
+    }
+
+    revalidatePath("/admin/productos");
+    revalidatePath("/admin/categorias");
+    revalidatePath("/admin");
+    revalidatePath("/categoria/[slug]", "page");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      count: productIds.length,
+      updatedProducts,
+    };
+  } catch (err: any) {
+    console.error("Error in bulkUpdateProductCategoryAction:", err);
+    return {
+      success: false,
+      count: 0,
+      error: err.message || "Error al actualizar categoría de productos",
+    };
   }
 }
 
