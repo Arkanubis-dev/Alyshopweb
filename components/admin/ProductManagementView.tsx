@@ -567,7 +567,7 @@ export function ProductManagementView({
   };
 
   // =================================================================
-  // BULK PHOTOS HANDLERS (HASTA 50 FOTOS)
+  // BULK PHOTOS HANDLERS (HASTA 150 FOTOS)
   // =================================================================
   const handleAddFilesToBulkQueue = (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -580,13 +580,13 @@ export function ProductManagementView({
       return;
     }
 
-    const MAX_LIMIT = 50;
+    const MAX_LIMIT = 150;
     const currentCount = bulkPhotosQueue.length;
     const availableSlots = Math.max(0, MAX_LIMIT - currentCount);
 
     if (availableSlots <= 0) {
       showToast(
-        "La caja ya tiene el límite de 50 fotos. Procesa o limpia el lote antes de agregar más.",
+        "La caja ya tiene el límite de 150 fotos. Procesa o limpia el lote antes de agregar más.",
         "error"
       );
       return;
@@ -596,7 +596,7 @@ export function ProductManagementView({
     if (imageFiles.length > availableSlots) {
       filesToAdd = imageFiles.slice(0, availableSlots);
       showToast(
-        `Se agregaron ${availableSlots} fotos (límite de 50 fotos por lote para evitar sobrecarga).`,
+        `Se agregaron ${availableSlots} fotos (límite de 150 fotos por lote para evitar sobrecarga).`,
         "error"
       );
     } else {
@@ -693,7 +693,7 @@ export function ProductManagementView({
     });
 
     const successfulAttachments: Array<{ productId: string; imageUrl: string }> = [];
-    const CONCURRENCY = 2; // Process 2 at a time for optimal speed and memory stability
+    const CONCURRENCY = 3; // Process 3 at a time for optimal speed and memory stability with up to 150 photos
 
     try {
       for (let i = 0; i < validItems.length; i += CONCURRENCY) {
@@ -1091,7 +1091,7 @@ export function ProductManagementView({
                 ? "bg-[#6D4BB8] text-white border-[#5837A3]"
                 : "bg-purple-50 hover:bg-purple-100 border-purple-200 text-[#6D4BB8]"
             }`}
-            title="Subir lotes de hasta 50 imágenes y asociarlas automáticamente a los productos por nombre coincidente"
+            title="Subir lotes de hasta 150 imágenes y asociarlas automáticamente a los productos por nombre coincidente"
           >
             <ImageIcon className={`w-4 h-4 ${isBulkPhotosOpen ? "text-white" : "text-[#6D4BB8]"}`} />
             <span>Carga Masiva Fotos</span>
@@ -1102,7 +1102,7 @@ export function ProductManagementView({
                   : "bg-[#6D4BB8] text-white"
               }`}
             >
-              {bulkPhotosQueue.length > 0 ? `${bulkPhotosQueue.length}/50` : "Hasta 50"}
+              {bulkPhotosQueue.length > 0 ? `${bulkPhotosQueue.length}/150` : "Hasta 150"}
             </span>
           </button>
 
@@ -1145,7 +1145,7 @@ export function ProductManagementView({
                     Caja de Carga Masiva de Fotos
                   </h2>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#FCE4EF] text-[#D83A7D] border border-[#F472A8]/30">
-                    Lotes de hasta 50 fotos
+                    Lotes de hasta 150 fotos
                   </span>
                 </div>
                 <p className="text-xs text-[#7A7590]">
@@ -1236,11 +1236,11 @@ export function ProductManagementView({
                   </button>
                 </p>
                 <p className="text-[11px] text-[#7A7590] mt-1">
-                  Formatos soportados: PNG, JPG, JPEG, WEBP. Máximo 50 fotos por lote para no sobrecargar el navegador.
+                  Formatos soportados: PNG, JPG, JPEG, WEBP. Máximo 150 fotos por lote para procesar rápidamente.
                 </p>
               </div>
 
-              {bulkPhotosQueue.length < 50 && (
+              {bulkPhotosQueue.length < 150 && (
                 <button
                   type="button"
                   onClick={() => bulkPhotosInputRef.current?.click()}
@@ -1248,7 +1248,7 @@ export function ProductManagementView({
                   className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Seleccionar Fotos (Lote hasta 50)</span>
+                  <span>Seleccionar Fotos (Lote hasta 150)</span>
                 </button>
               )}
             </div>
@@ -1261,7 +1261,7 @@ export function ProductManagementView({
                 {/* Stats */}
                 <div className="flex items-center gap-2.5 flex-wrap text-xs">
                   <span className="font-extrabold text-[#2E2A3B]">
-                    Cola de fotos: {bulkPhotosQueue.length}/50
+                    Cola de fotos: {bulkPhotosQueue.length}/150
                   </span>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
                     <CheckCircle2 className="w-3.5 h-3.5" />
