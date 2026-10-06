@@ -7,8 +7,13 @@ import { Home, Grid, Heart, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
 import { MobileCategoryDrawer } from "./MobileCategoryDrawer";
+import { Category } from "@/types";
 
-export function MobileBottomNav() {
+interface MobileBottomNavProps {
+  categories?: Category[];
+}
+
+export function MobileBottomNav({ categories = [] }: MobileBottomNavProps = {}) {
   const pathname = usePathname();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -111,6 +116,7 @@ export function MobileBottomNav() {
       <MobileCategoryDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
+        categories={categories}
       />
     </>
   );

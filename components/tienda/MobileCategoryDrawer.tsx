@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   X,
@@ -19,9 +19,9 @@ import {
   ShieldCheck,
   Truck,
 } from "lucide-react";
-import { MOCK_CATEGORIES } from "@/lib/mock-data";
+import { Category } from "@/types";
+import { getActiveCategoriesAction } from "@/app/actions/categories";
 import { Logo } from "./Logo";
-
 import { PerfumeIcon } from "./PerfumeIcon";
 
 interface MobileCategoryDrawerProps {
@@ -29,6 +29,7 @@ interface MobileCategoryDrawerProps {
   onClose: () => void;
   logoUrl?: string;
   storeName?: string;
+  categories?: Category[];
 }
 
 const ICON_MAP: Record<string, any> = {
@@ -51,7 +52,34 @@ export function MobileCategoryDrawer({
   onClose,
   logoUrl,
   storeName,
+  categories: initialCategories = [],
 }: MobileCategoryDrawerProps) {
+  const [categories, setCategories] = useState<Category[]>(() =>
+    (initialCategories || []).filter((c) => c.is_active !== false)
+  );
+
+  // Sync with initialCategories prop
+  useEffect(() => {
+    if (initialCategories && initialCategories.length > 0) {
+      setCategories(initialCategories.filter((c) => c.is_active !== false));
+    }
+  }, [initialCategories]);
+
+  // Fetch active categories if empty when opened
+  useEffect(() => {
+    if (isOpen && categories.length === 0) {
+      getActiveCategoriesAction()
+        .then((cats) => {
+          if (cats && cats.length > 0) {
+            setCategories(cats.filter((c) => c.is_active !== false));
+          }
+        })
+        .catch((err) => {
+          console.error("Error cargando categorías activas en móvil:", err);
+        });
+    }
+  }, [isOpen, categories.length]);
+
   // Lock body scroll when drawer is open
   useEffect(() => {
     if (isOpen) {
@@ -65,6 +93,9 @@ export function MobileCategoryDrawer({
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  // Filtrar estrictamente solo las categorías activas (is_active !== false)
+  const activeCategories = categories.filter((c) => c.is_active !== false);
 
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
@@ -81,7 +112,7 @@ export function MobileCategoryDrawer({
           <Logo size="sm" showSlogan={false} logoUrl={logoUrl} storeName={storeName} />
           <button
             onClick={onClose}
-            className="p-2 text-[#7A7590] hover:text-[#2E2A3B] hover:bg-[#FCE4EF]/50 rounded-full transition-colors"
+            className="p-2 text-[#7A7590] hover:text-[#2E2A3B] hover:bg-[#FCE4EF]/50 rounded-full transition-colors cursor-pointer"
             aria-label="Cerrar menú"
           >
             <X className="w-5 h-5" />
@@ -91,32 +122,74 @@ export function MobileCategoryDrawer({
         {/* Drawer Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
           <div>
-            <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-[#6D4BB8] mb-2">
-              Todas las Categorías
+            <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-[#6D4BB8] mb-2 flex items-center justify-between">
+              <span>Categorías</span>
+              <span className="text-[11px] font-semibold text-[#7A7590] bg-[#FAF5FB] px-2 py-0.5 rounded-full border border-[#F0E8F2]">
+                {activeCategories.length} activas
+              </span>
             </div>
+
             <div className="bg-white rounded-2xl border border-[#F0E8F2] overflow-hidden shadow-xs divide-y divide-[#FAF5FC]">
-              {MOCK_CATEGORIES.map((cat) => {
+              {/* Opción para Ver Todos los Productos */}
+              <Link
+                href="/categoria/todos"
+                onClick={onClose}
+                className="flex items-center justify-between px-3.5 py-3 hover:bg-[#EEEAFB] text-[#2E2A3B] transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#EEEAFB] flex items-center justify-center text-[#6D4BB8] group-hover:bg-[#6D4BB8] group-hover:text-white transition-colors">
+                    <Grid className="w-4 h-4" strokeWidth={1.6} />
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold group-hover:text-[#6D4BB8] block">
+                      Todos los productos
+                    </span>
+                    <span className="text-[10px] text-[#7A7590]">
+                      Explorar catálogo completo
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-[#7A7590] group-hover:text-[#6D4BB8] group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+
+              {/* Categorías Activas */}
+              {activeCategories.map((cat) => {
                 const IconComponent = ICON_MAP[cat.icon] || Grid;
                 return (
                   <Link
-                    key={cat.id}
+                    key={cat.id || cat.slug}
                     href={`/categoria/${cat.slug}`}
                     onClick={onClose}
                     className="flex items-center justify-between px-3.5 py-3 hover:bg-[#EEEAFB] text-[#2E2A3B] transition-colors group"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-[#FCE4EF] flex items-center justify-center text-[#6D4BB8] group-hover:bg-[#EEEAFB] overflow-hidden">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6D4BB8] group-hover:scale-105 transition-all overflow-hidden shrink-0 border border-black/5"
+                        style={{ backgroundColor: cat.color || "#FCE4EF" }}
+                      >
                         {cat.image_url ? (
-                          <img src={cat.image_url} alt={cat.name} className="w-5 h-5 object-contain" />
+                          <img
+                            src={cat.image_url}
+                            alt={cat.name}
+                            className="w-5 h-5 object-contain"
+                          />
                         ) : (
                           <IconComponent className="w-4 h-4" strokeWidth={1.5} />
                         )}
                       </div>
-                      <span className="text-sm font-medium group-hover:text-[#6D4BB8]">
-                        {cat.name}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium group-hover:text-[#6D4BB8] truncate block">
+                          {cat.name}
+                        </span>
+                        {cat.subcategories && cat.subcategories.length > 0 && (
+                          <span className="text-[10px] text-[#7A7590] truncate block">
+                            {cat.subcategories.slice(0, 3).join(", ")}
+                            {cat.subcategories.length > 3 ? "..." : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-[#7A7590] group-hover:text-[#6D4BB8] group-hover:translate-x-0.5 transition-transform" />
+                    <ChevronRight className="w-4 h-4 text-[#7A7590] group-hover:text-[#6D4BB8] group-hover:translate-x-0.5 transition-transform shrink-0 ml-2" />
                   </Link>
                 );
               })}

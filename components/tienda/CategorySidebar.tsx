@@ -38,6 +38,8 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export function CategorySidebar({ categories, activeSlug }: CategorySidebarProps) {
+  const activeCategories = (categories || []).filter((c) => c.is_active !== false);
+
   return (
     <aside className="w-full bg-white rounded-2xl border border-[#F0E8F2] shadow-xs overflow-hidden">
       {/* Header with menu icon and soft pink background */}
@@ -51,7 +53,7 @@ export function CategorySidebar({ categories, activeSlug }: CategorySidebarProps
       {/* Category List */}
       <nav aria-label="Categorías de productos">
         <ul className="divide-y divide-[#F7F2F9]">
-          {categories.map((cat) => {
+          {activeCategories.map((cat) => {
             const IconComponent = ICON_MAP[cat.icon] || Grid;
             const isActive = activeSlug === cat.slug;
 

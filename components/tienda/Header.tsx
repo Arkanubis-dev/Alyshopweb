@@ -9,14 +9,16 @@ import { MobileCategoryDrawer } from "./MobileCategoryDrawer";
 import { useCartStore } from "@/store/useCartStore";
 import { useFavoritesStore } from "@/store/useFavoritesStore";
 import { isColorDark } from "@/lib/theme-palettes";
+import { Category } from "@/types";
 
 interface HeaderProps {
   logoUrl?: string;
   storeName?: string;
   headerBg?: string;
+  categories?: Category[];
 }
 
-export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
+export function Header({ logoUrl, storeName, headerBg, categories = [] }: HeaderProps = {}) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
 
@@ -184,6 +186,7 @@ export function Header({ logoUrl, storeName, headerBg }: HeaderProps = {}) {
         onClose={() => setIsDrawerOpen(false)}
         logoUrl={logoUrl}
         storeName={storeName}
+        categories={categories}
       />
     </>
   );

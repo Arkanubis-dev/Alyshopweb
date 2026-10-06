@@ -5,6 +5,7 @@ import { MobileBottomNav } from "@/components/tienda/MobileBottomNav";
 import { WhatsAppFloatingButton } from "@/components/tienda/WhatsAppFloatingButton";
 import { CategoryWatermarks } from "@/components/tienda/CategoryWatermarks";
 import { getAdminSettingsAction } from "@/app/actions/settings";
+import { getCategories } from "@/lib/supabase/queries";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,7 +15,13 @@ export default async function TiendaLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const settings = await getAdminSettingsAction();
+  const [settings, categories] = await Promise.all([
+    getAdminSettingsAction(),
+    getCategories(),
+  ]);
+
+  // Solo categorías activas para navegación móvil y de escritorio
+  const activeCategories = (categories || []).filter((c) => c.is_active !== false);
 
   return (
     <div className="tienda-root min-h-screen flex flex-col bg-[#FFFBF7] relative">
@@ -27,12 +34,13 @@ export default async function TiendaLayout({
           logoUrl={settings.logo_url}
           storeName={settings.name}
           headerBg={settings.header_bg_color}
+          categories={activeCategories}
         />
         <main className="flex-1">{children}</main>
         <BottomValueStrip />
-        <Footer />
+        <Footer categories={activeCategories} />
         <WhatsAppFloatingButton />
-        <MobileBottomNav />
+        <MobileBottomNav categories={activeCategories} />
       </div>
     </div>
   );

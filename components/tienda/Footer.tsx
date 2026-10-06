@@ -2,8 +2,13 @@ import Link from "next/link";
 import { MessageCircle, Heart, MapPin, Phone } from "lucide-react";
 import { Logo } from "./Logo";
 import { getStoreSettings } from "@/lib/supabase/queries";
+import { Category } from "@/types";
 
-export async function Footer() {
+interface FooterProps {
+  categories?: Category[];
+}
+
+export async function Footer({ categories = [] }: FooterProps = {}) {
   const settings = await getStoreSettings();
 
   const rawWhatsapp =
@@ -62,36 +67,29 @@ export async function Footer() {
               Categorías
             </h4>
             <ul className="space-y-2 text-xs sm:text-sm text-[#7A7590]">
-              <li>
-                <Link href="/categoria/hogar-y-decoracion" className="hover:text-[#6D4BB8] transition-colors">
-                  Hogar y decoración
-                </Link>
-              </li>
-              <li>
-                <Link href="/categoria/cocina-y-comedor" className="hover:text-[#6D4BB8] transition-colors">
-                  Cocina y comedor
-                </Link>
-              </li>
-              <li>
-                <Link href="/categoria/belleza-y-cuidado-personal" className="hover:text-[#6D4BB8] transition-colors">
-                  Belleza y cuidado personal
-                </Link>
-              </li>
-              <li>
-                <Link href="/categoria/perfumes" className="hover:text-[#6D4BB8] transition-colors">
-                  Perfumería y fragancias
-                </Link>
-              </li>
-              <li>
-                <Link href="/categoria/tecnologia-y-accesorios" className="hover:text-[#6D4BB8] transition-colors">
-                  Tecnología y accesorios
-                </Link>
-              </li>
-              <li>
-                <Link href="/categoria/mascotas" className="hover:text-[#6D4BB8] transition-colors">
-                  Mascotas
-                </Link>
-              </li>
+              {categories && categories.length > 0 ? (
+                categories
+                  .filter((c) => c.is_active !== false)
+                  .slice(0, 6)
+                  .map((cat) => (
+                    <li key={cat.id || cat.slug}>
+                      <Link
+                        href={`/categoria/${cat.slug}`}
+                        className="hover:text-[#6D4BB8] transition-colors"
+                      >
+                        {cat.name}
+                      </Link>
+                    </li>
+                  ))
+              ) : (
+                <>
+                  <li>
+                    <Link href="/categoria/todos" className="hover:text-[#6D4BB8] transition-colors">
+                      Todos los productos
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
 

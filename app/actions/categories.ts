@@ -327,4 +327,15 @@ export async function bulkAddSubcategoryAction(
   }
 }
 
+export async function getActiveCategoriesAction(): Promise<Category[]> {
+  try {
+    const all = await getAllAdminCategories();
+    return all.filter((c) => c.is_active !== false);
+  } catch (err) {
+    console.error("Error in getActiveCategoriesAction:", err);
+    return [];
+  }
+}
+
+
 
