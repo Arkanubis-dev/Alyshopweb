@@ -24,7 +24,7 @@ function mapDbProduct(item: any, subcategoryMap?: Record<string, string>): Produ
     id: item.id,
     category_id: item.category_id,
     category_name: item.categories?.name || "",
-    subcategory: (subcategoryMap && subcategoryMap[item.id]) || "",
+    subcategory: (subcategoryMap && subcategoryMap[item.id]) || item.subcategory || "",
     name: item.name,
     slug: item.slug,
     description: item.description || "",

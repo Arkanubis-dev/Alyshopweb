@@ -337,5 +337,125 @@ export async function getActiveCategoriesAction(): Promise<Category[]> {
   }
 }
 
+export async function validateAndSyncSubcategoriesAction(): Promise<{
+  success: boolean;
+  fixedCount: number;
+  error?: string;
+  categories?: Category[];
+}> {
+  try {
+    const supabase = createAdminClient();
+    if (!supabase) {
+      return { success: true, fixedCount: 0, categories: adminCategoriesStore };
+    }
+
+    const { getCanonicalSubcategoryName, normalizeSubcategory } = await import("@/lib/subcategories");
+
+    const [subConfig, { data: dbCategories }, { data: dbProducts }] = await Promise.all([
+      getSubcategoriesConfig(supabase),
+      supabase.from("categories").select("*").order("sort_order", { ascending: true }),
+      supabase.from("products").select("id, name, category_id"),
+    ]);
+
+    const prodsMap = new Map((dbProducts || []).map((p: any) => [p.id, p]));
+    const catsMap = new Map((dbCategories || []).map((c: any) => [c.id, c]));
+
+    let fixedCount = 0;
+    const newProductSubs: Record<string, string> = {};
+    const newCatSubs: Record<string, string[]> = { ...subConfig.categories };
+
+    // 1. Validate & normalize all product subcategories
+    for (const [pId, rawSub] of Object.entries(subConfig.products)) {
+      const prod = prodsMap.get(pId);
+      if (!prod) {
+        // Orphaned product key, discard
+        fixedCount++;
+        continue;
+      }
+
+      const canonicalSub = getCanonicalSubcategoryName(rawSub);
+      newProductSubs[pId] = canonicalSub;
+
+      if (rawSub !== canonicalSub) {
+        fixedCount++;
+      }
+
+      // Ensure the product's category contains this canonical subcategory
+      if (prod.category_id) {
+        const currentList = newCatSubs[prod.category_id] || [];
+        const hasNorm = currentList.some(
+          (s) => normalizeSubcategory(s) === normalizeSubcategory(canonicalSub)
+        );
+        if (!hasNorm) {
+          newCatSubs[prod.category_id] = [...currentList, canonicalSub];
+          fixedCount++;
+        } else {
+          newCatSubs[prod.category_id] = currentList.map((s) =>
+            normalizeSubcategory(s) === normalizeSubcategory(canonicalSub) ? canonicalSub : s
+          );
+        }
+      }
+    }
+
+    // 2. Normalize and deduplicate all category subcategories lists
+    for (const catId of Object.keys(newCatSubs)) {
+      const list = newCatSubs[catId] || [];
+      const seen = new Set<string>();
+      const deduplicated: string[] = [];
+
+      for (const item of list) {
+        const canonical = getCanonicalSubcategoryName(item);
+        const norm = normalizeSubcategory(canonical);
+        if (!seen.has(norm)) {
+          seen.add(norm);
+          deduplicated.push(canonical);
+        }
+      }
+      newCatSubs[catId] = deduplicated;
+    }
+
+    // 3. Save clean config to Supabase
+    const newConfig = {
+      categories: newCatSubs,
+      products: newProductSubs,
+    };
+
+    const { error: saveError } = await supabase.from("settings").upsert({
+      key: "subcategories_config",
+      value: newConfig,
+    });
+
+    if (saveError) throw saveError;
+
+    // 4. Update memory store
+    for (const cat of adminCategoriesStore) {
+      if (newCatSubs[cat.id]) {
+        cat.subcategories = newCatSubs[cat.id];
+      }
+    }
+
+    revalidatePath("/admin/categorias");
+    revalidatePath("/admin/productos");
+    revalidatePath("/admin");
+    revalidatePath("/categoria/[slug]", "page");
+    revalidatePath("/");
+
+    const updatedCategories = await getAllAdminCategories();
+
+    return {
+      success: true,
+      fixedCount,
+      categories: updatedCategories,
+    };
+  } catch (err: any) {
+    console.error("Error in validateAndSyncSubcategoriesAction:", err);
+    return {
+      success: false,
+      fixedCount: 0,
+      error: err.message || "Error al validar subcategorías",
+    };
+  }
+}
+
 
 

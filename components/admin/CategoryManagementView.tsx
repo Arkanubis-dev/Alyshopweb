@@ -42,7 +42,9 @@ import {
   toggleCategoryStatusAction,
   reorderCategoriesAction,
   bulkAddSubcategoryAction,
+  validateAndSyncSubcategoriesAction,
 } from "@/app/actions/categories";
+import { isSubcategoryMatch, getCanonicalSubcategoryName } from "@/lib/subcategories";
 import {
   uploadProductImageAction,
   bulkUpdateProductCategoryAction,
@@ -115,6 +117,38 @@ export function CategoryManagementView({
   const [isBulkAddSubModalOpen, setIsBulkAddSubModalOpen] = useState(false);
   const [bulkAddSubInput, setBulkAddSubInput] = useState("");
   const [isSavingBulkAddSub, setIsSavingBulkAddSub] = useState(false);
+
+  // Subcategory Sync State
+  const [isValidatingSubs, setIsValidatingSubs] = useState(false);
+
+  const handleValidateAndSyncSubs = async () => {
+    try {
+      setIsValidatingSubs(true);
+      const res = await validateAndSyncSubcategoriesAction();
+      if (res.success) {
+        if (res.categories) {
+          setCategories(res.categories);
+        }
+        setLocalProducts((prev) =>
+          prev.map((p) => ({
+            ...p,
+            subcategory: p.subcategory ? getCanonicalSubcategoryName(p.subcategory) : "",
+          }))
+        );
+        showToast(
+          res.fixedCount > 0
+            ? `¡Se validaron y sincronizaron ${res.fixedCount} subcategorías con éxito!`
+            : "¡Todas las subcategorías ya se encuentran perfectamente sincronizadas!"
+        );
+      } else {
+        showToast(res.error || "Error al sincronizar subcategorías", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Error al sincronizar", "error");
+    } finally {
+      setIsValidatingSubs(false);
+    }
+  };
 
   const totalProductsInSelected = useMemo(() => {
     return localProducts.filter((p) => selectedCategoryIds.includes(p.category_id)).length;
@@ -277,7 +311,7 @@ export function CategoryManagementView({
       if (reassignSubFilter !== "all") {
         if (reassignSubFilter === "__empty__") {
           if (p.subcategory && p.subcategory.trim()) return false;
-        } else if (p.subcategory !== reassignSubFilter) {
+        } else if (!isSubcategoryMatch(p.subcategory, reassignSubFilter)) {
           return false;
         }
       }
@@ -607,6 +641,21 @@ export function CategoryManagementView({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            disabled={isValidatingSubs}
+            onClick={handleValidateAndSyncSubs}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#6D4BB8] border border-purple-200 text-xs sm:text-sm font-bold shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+            title="Validar y sincronizar todas las subcategorías con sus categorías correspondientes"
+          >
+            {isValidatingSubs ? (
+              <Loader2 className="w-4 h-4 text-[#6D4BB8] animate-spin" />
+            ) : (
+              <Layers className="w-4 h-4 text-[#6D4BB8]" />
+            )}
+            <span>Sincronizar Subcategorías</span>
+          </button>
+
           <button
             type="button"
             onClick={() => handleOpenReassignModal()}

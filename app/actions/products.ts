@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Product } from "@/types";
 import { MOCK_PRODUCTS } from "@/lib/mock-data";
 import { getSubcategoriesConfig, getAllAdminCategories } from "./categories";
+import { getCanonicalSubcategoryName, normalizeSubcategory } from "@/lib/subcategories";
 
 // Fallback products in-memory store for local demo mode
 const globalForProducts = global as unknown as { adminProducts: Product[] };
@@ -34,7 +35,7 @@ export async function getAllAdminProducts(): Promise<Product[]> {
           id: item.id,
           category_id: item.category_id,
           category_name: item.categories?.name || "",
-          subcategory: subConfig.products[item.id] || "",
+          subcategory: subConfig.products[item.id] || item.subcategory || "",
           name: item.name,
           slug: item.slug,
           description: item.description || "",
@@ -148,8 +149,15 @@ export async function saveProductAction(productData: Partial<Product>): Promise<
 
       if (productData.subcategory !== undefined) {
         const subConfig = await getSubcategoriesConfig(supabase);
-        if (productData.subcategory) {
-          subConfig.products[finalId] = productData.subcategory;
+        if (productData.subcategory && productData.subcategory.trim()) {
+          const canonical = getCanonicalSubcategoryName(productData.subcategory);
+          subConfig.products[finalId] = canonical;
+          if (productData.category_id) {
+            const currentSubs = subConfig.categories[productData.category_id] || [];
+            if (!currentSubs.some((s) => normalizeSubcategory(s) === normalizeSubcategory(canonical))) {
+              subConfig.categories[productData.category_id] = [...currentSubs, canonical];
+            }
+          }
         } else {
           delete subConfig.products[finalId];
         }
@@ -493,13 +501,26 @@ export async function bulkUpdateProductCategoryAction(
       // 2. Update subcategories_config in settings
       if (!updateCategoryOnly && newSubcategory !== undefined) {
         const subConfig = await getSubcategoriesConfig(supabase);
+        const canonicalSub =
+          newSubcategory && newSubcategory.trim()
+            ? getCanonicalSubcategoryName(newSubcategory.trim())
+            : "";
+
         for (const id of productIds) {
-          if (newSubcategory && newSubcategory.trim()) {
-            subConfig.products[id] = newSubcategory.trim();
+          if (canonicalSub) {
+            subConfig.products[id] = canonicalSub;
           } else {
             delete subConfig.products[id];
           }
         }
+
+        if (canonicalSub && newCategoryId) {
+          const cur = subConfig.categories[newCategoryId] || [];
+          if (!cur.some((s) => normalizeSubcategory(s) === normalizeSubcategory(canonicalSub))) {
+            subConfig.categories[newCategoryId] = [...cur, canonicalSub];
+          }
+        }
+
         await supabase.from("settings").upsert({
           key: "subcategories_config",
           value: subConfig,
@@ -646,14 +667,19 @@ export async function bulkImportProductsAction(
         });
       }
 
-      if (item.subcategory) {
-        subcategoryMap[finalId] = item.subcategory;
+      const cleanSub =
+        item.subcategory && item.subcategory.trim()
+          ? getCanonicalSubcategoryName(item.subcategory.trim())
+          : undefined;
+
+      if (cleanSub) {
+        subcategoryMap[finalId] = cleanSub;
       }
 
       const fullProduct: Product = {
         id: finalId,
         category_id: item.category_id,
-        subcategory: item.subcategory,
+        subcategory: cleanSub || "",
         name: item.name,
         slug,
         description: item.description || "",
@@ -688,6 +714,18 @@ export async function bulkImportProductsAction(
     if (supabase && Object.keys(subcategoryMap).length > 0) {
       const subConfig = await getSubcategoriesConfig(supabase);
       Object.assign(subConfig.products, subcategoryMap);
+
+      // Auto-register imported subcategories in categories list
+      for (const item of items) {
+        if (item.subcategory && item.subcategory.trim() && item.category_id) {
+          const canonical = getCanonicalSubcategoryName(item.subcategory.trim());
+          const cur = subConfig.categories[item.category_id] || [];
+          if (!cur.some((s) => normalizeSubcategory(s) === normalizeSubcategory(canonical))) {
+            subConfig.categories[item.category_id] = [...cur, canonical];
+          }
+        }
+      }
+
       await supabase.from("settings").upsert({
         key: "subcategories_config",
         value: subConfig,

@@ -54,6 +54,13 @@ import {
   bulkUpdateProductCategoryAction,
   BulkProductInput,
 } from "@/app/actions/products";
+import { validateAndSyncSubcategoriesAction } from "@/app/actions/categories";
+import {
+  isSubcategoryMatch,
+  findCanonicalSubcategory,
+  getCanonicalSubcategoryName,
+  normalizeSubcategory,
+} from "@/lib/subcategories";
 import { findBestMatchingProduct, MatchConfidence } from "@/lib/product-matcher";
 
 interface ProductManagementViewProps {
@@ -63,9 +70,46 @@ interface ProductManagementViewProps {
 
 export function ProductManagementView({
   initialProducts,
-  categories,
+  categories: initialCategories,
 }: ProductManagementViewProps) {
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [products, setProducts] = useState<Product[]>(initialProducts);
+
+  useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]);
+
+  const [isValidatingSubs, setIsValidatingSubs] = useState(false);
+
+  const handleValidateAndSyncSubs = async () => {
+    try {
+      setIsValidatingSubs(true);
+      const res = await validateAndSyncSubcategoriesAction();
+      if (res.success) {
+        if (res.categories) {
+          setCategories(res.categories);
+        }
+        setProducts((prev) =>
+          prev.map((p) => ({
+            ...p,
+            subcategory: p.subcategory ? getCanonicalSubcategoryName(p.subcategory) : "",
+          }))
+        );
+        showToast(
+          res.fixedCount > 0
+            ? `¡Se validaron y sincronizaron ${res.fixedCount} subcategorías con éxito!`
+            : "¡Todas las subcategorías ya se encuentran perfectamente sincronizadas!"
+        );
+      } else {
+        showToast(res.error || "Error al sincronizar subcategorías", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Error al sincronizar", "error");
+    } finally {
+      setIsValidatingSubs(false);
+    }
+  };
+
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todas");
   const [selectedSubcategory, setSelectedSubcategory] = useState("todas");
@@ -245,7 +289,10 @@ export function ProductManagementView({
         return false;
       }
       // Subcategory filter
-      if (selectedSubcategory !== "todas" && p.subcategory !== selectedSubcategory) {
+      if (
+        selectedSubcategory !== "todas" &&
+        !isSubcategoryMatch(p.subcategory, selectedSubcategory)
+      ) {
         return false;
       }
       // Stock filter
@@ -502,7 +549,7 @@ export function ProductManagementView({
             row["Descripcion"] || row["descripcion"] || row["DESCRIPCION"] || "";
           const sku = row["SKU"] || row["sku"] || "";
 
-          let matchedCatId = categories[0]?.id || "";
+          let matchedCatId = "";
           if (catName) {
             const found = categories.find(
               (c) =>
@@ -512,10 +559,27 @@ export function ProductManagementView({
             if (found) matchedCatId = found.id;
           }
 
+          // If category name was not matched, but subcategory was provided, auto-match by subcategory
+          if (!matchedCatId && subCat) {
+            const cleanSub = String(subCat).trim();
+            const foundBySub = categories.find((c) =>
+              (c.subcategories || []).some((s) => isSubcategoryMatch(s, cleanSub))
+            );
+            if (foundBySub) matchedCatId = foundBySub.id;
+          }
+
+          if (!matchedCatId) {
+            matchedCatId = categories[0]?.id || "";
+          }
+
+          const finalSub = subCat
+            ? getCanonicalSubcategoryName(String(subCat).trim())
+            : undefined;
+
           parsed.push({
             name: String(name).trim(),
             category_id: matchedCatId,
-            subcategory: subCat ? String(subCat).trim() : undefined,
+            subcategory: finalSub,
             price: Math.max(0, price),
             cost: cost !== undefined && !isNaN(cost) ? Math.max(0, cost) : undefined,
             compare_price:
@@ -820,9 +884,15 @@ export function ProductManagementView({
   };
 
   const handleOpenEdit = (product: Product) => {
+    const currentCat = categories.find((c) => c.id === product.category_id);
+    const canonicalSub =
+      findCanonicalSubcategory(product.subcategory, currentCat?.subcategories || []) ||
+      product.subcategory ||
+      "";
+
     setEditingProduct({
       ...product,
-      subcategory: product.subcategory || "",
+      subcategory: canonicalSub,
     });
     setIsDrawerOpen(true);
   };
@@ -1104,6 +1174,22 @@ export function ProductManagementView({
             >
               {bulkPhotosQueue.length > 0 ? `${bulkPhotosQueue.length}/150` : "Hasta 150"}
             </span>
+          </button>
+
+          {/* Sincronizar Subcategorías */}
+          <button
+            type="button"
+            disabled={isValidatingSubs}
+            onClick={handleValidateAndSyncSubs}
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-xs font-bold text-[#6D4BB8] shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+            title="Validar y sincronizar todas las subcategorías de los productos con sus categorías correspondientes"
+          >
+            {isValidatingSubs ? (
+              <Loader2 className="w-4 h-4 text-[#6D4BB8] animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 text-[#6D4BB8]" />
+            )}
+            <span className="hidden lg:inline">Sincronizar Subcategorías</span>
           </button>
 
           {/* Exportar CSV */}
@@ -1494,8 +1580,47 @@ export function ProductManagementView({
 
           {/* Subcategory Filter */}
           {(() => {
-            const catObj = categories.find((c) => c.id === selectedCategory);
-            if (catObj && catObj.subcategories && catObj.subcategories.length > 0) {
+            const availableSubs: string[] = [];
+            const seen = new Set<string>();
+
+            if (selectedCategory !== "todas") {
+              const catObj = categories.find((c) => c.id === selectedCategory);
+              const catSubs = catObj?.subcategories || [];
+              const prodSubs = products
+                .filter((p) => p.category_id === selectedCategory)
+                .map((p) => p.subcategory?.trim())
+                .filter((s): s is string => Boolean(s && s.length > 0));
+
+              for (const s of [...catSubs, ...prodSubs]) {
+                const norm = normalizeSubcategory(s);
+                if (!seen.has(norm)) {
+                  seen.add(norm);
+                  availableSubs.push(s);
+                }
+              }
+            } else {
+              // Across all categories
+              for (const c of categories) {
+                for (const s of c.subcategories || []) {
+                  const norm = normalizeSubcategory(s);
+                  if (!seen.has(norm)) {
+                    seen.add(norm);
+                    availableSubs.push(s);
+                  }
+                }
+              }
+              for (const p of products) {
+                if (p.subcategory && p.subcategory.trim()) {
+                  const norm = normalizeSubcategory(p.subcategory);
+                  if (!seen.has(norm)) {
+                    seen.add(norm);
+                    availableSubs.push(p.subcategory.trim());
+                  }
+                }
+              }
+            }
+
+            if (availableSubs.length > 0) {
               return (
                 <select
                   value={selectedSubcategory}
@@ -1503,7 +1628,7 @@ export function ProductManagementView({
                   className="text-xs font-semibold text-[#6D4BB8] bg-[#EEEAFB] border border-[#E0D4F0] rounded-xl px-3 py-2 focus:outline-none focus:border-[#6D4BB8] cursor-pointer"
                 >
                   <option value="todas">Todas las subcategorías</option>
-                  {catObj.subcategories.map((sub) => (
+                  {availableSubs.map((sub) => (
                     <option key={sub} value={sub}>
                       {sub}
                     </option>
@@ -2405,31 +2530,48 @@ export function ProductManagementView({
                 {/* Subcategoría selector */}
                 {(() => {
                   const currentCat = categories.find((c) => c.id === editingProduct.category_id);
-                  if (currentCat && currentCat.subcategories && currentCat.subcategories.length > 0) {
-                    return (
-                      <div className="space-y-1 p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2]">
-                        <label className="text-xs font-semibold text-[#2E2A3B] flex items-center justify-between">
-                          <span>Subcategoría (Opcional)</span>
-                          <span className="text-[10px] text-[#6D4BB8] font-bold">No obligatorio</span>
-                        </label>
-                        <select
-                          value={editingProduct.subcategory || ""}
-                          onChange={(e) =>
-                            setEditingProduct({ ...editingProduct, subcategory: e.target.value })
-                          }
-                          className="w-full text-xs p-2.5 rounded-lg bg-white border border-[#E0D4F0] focus:outline-none focus:border-[#6D4BB8]"
-                        >
-                          <option value="">Sin subcategoría (General)</option>
-                          {currentCat.subcategories.map((sub) => (
-                            <option key={sub} value={sub}>
-                              {sub}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    );
+                  const baseSubs = currentCat?.subcategories || [];
+
+                  // Build options list: include category subcategories, plus editingProduct's subcategory if not already in list
+                  const subOptions = [...baseSubs];
+                  if (
+                    editingProduct.subcategory &&
+                    editingProduct.subcategory.trim() &&
+                    !subOptions.some((s) => isSubcategoryMatch(s, editingProduct.subcategory))
+                  ) {
+                    subOptions.push(editingProduct.subcategory.trim());
                   }
-                  return null;
+
+                  // Determine selected value: find canonical match in subOptions
+                  const selectedVal =
+                    findCanonicalSubcategory(editingProduct.subcategory, subOptions) ||
+                    editingProduct.subcategory ||
+                    "";
+
+                  return (
+                    <div className="space-y-1 p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2]">
+                      <label className="text-xs font-semibold text-[#2E2A3B] flex items-center justify-between">
+                        <span>Subcategoría (Opcional)</span>
+                        <span className="text-[10px] text-[#6D4BB8] font-bold">
+                          {editingProduct.subcategory ? "Asignada" : "Sin asignar"}
+                        </span>
+                      </label>
+                      <select
+                        value={selectedVal}
+                        onChange={(e) =>
+                          setEditingProduct({ ...editingProduct, subcategory: e.target.value })
+                        }
+                        className="w-full text-xs p-2.5 rounded-lg bg-white border border-[#E0D4F0] focus:outline-none focus:border-[#6D4BB8]"
+                      >
+                        <option value="">Sin subcategoría (General)</option>
+                        {subOptions.map((sub) => (
+                          <option key={sub} value={sub}>
+                            {sub}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
                 })()}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

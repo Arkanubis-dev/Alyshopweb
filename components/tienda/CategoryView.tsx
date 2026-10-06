@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ChevronRight, SlidersHorizontal, ArrowUpDown, X, Sparkles, Filter } from "lucide-react";
 import { Category, Product } from "@/types";
+import { isSubcategoryMatch } from "@/lib/subcategories";
 import { ProductCard } from "./ProductCard";
 import { CategorySidebar } from "./CategorySidebar";
 
@@ -27,11 +28,38 @@ export function CategoryView({
   const [sortBy, setSortBy] = useState<string>("recientes");
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
 
+  // Available subcategories combining category configuration and actual product subcategories
+  const availableSubcategories = useMemo(() => {
+    const fromCat = category?.subcategories || [];
+    const fromProducts = initialProducts
+      .map((p) => p.subcategory?.trim())
+      .filter((s): s is string => Boolean(s && s.length > 0));
+
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const sub of [...fromCat, ...fromProducts]) {
+      const norm = sub
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        result.push(sub);
+      }
+    }
+    return result;
+  }, [category?.subcategories, initialProducts]);
+
   // Filtered and sorted products
   const filteredProducts = useMemo(() => {
     return initialProducts
       .filter((p) => {
-        if (selectedSubcategory !== "todas" && p.subcategory !== selectedSubcategory) {
+        if (
+          selectedSubcategory !== "todas" &&
+          !isSubcategoryMatch(p.subcategory, selectedSubcategory)
+        ) {
           return false;
         }
         if (onlyAvailable && p.stock <= 0) return false;
@@ -111,7 +139,7 @@ export function CategoryView({
         </div>
 
         {/* Subcategories Filter Pills */}
-        {category?.subcategories && category.subcategories.length > 0 && (
+        {availableSubcategories.length > 0 && (
           <div className="pt-5 mt-4 border-t border-black/5 flex items-center gap-2 overflow-x-auto no-scrollbar relative z-10">
             <span className="text-xs font-bold text-[#6D4BB8] shrink-0 mr-1">
               Subcategorías:
@@ -127,8 +155,8 @@ export function CategoryView({
             >
               Todas
             </button>
-            {category.subcategories.map((sub) => {
-              const isSelected = selectedSubcategory === sub;
+            {availableSubcategories.map((sub) => {
+              const isSelected = isSubcategoryMatch(selectedSubcategory, sub);
               return (
                 <button
                   key={sub}
