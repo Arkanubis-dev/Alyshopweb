@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, ChevronRight, Filter, X, ArrowUpDown } from "lucide-react";
 import { Product } from "@/types";
 import { ProductCard } from "./ProductCard";
+import { CustomerPagination, CustomerPageSizeOption } from "./CustomerPagination";
 
 interface SearchViewProps {
   initialQuery: string;
@@ -18,7 +19,13 @@ export function SearchView({ initialQuery, initialProducts }: SearchViewProps) {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [sortBy, setSortBy] = useState("recientes");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<CustomerPageSizeOption>(20);
   const router = useRouter();
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, onlyAvailable, minPrice, maxPrice, sortBy]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +49,12 @@ export function SearchView({ initialQuery, initialProducts }: SearchViewProps) {
       });
   }, [initialProducts, onlyAvailable, minPrice, maxPrice, sortBy]);
 
+  const paginatedProducts = useMemo(() => {
+    if (pageSize === "all") return filteredProducts;
+    const start = (currentPage - 1) * (pageSize as number);
+    return filteredProducts.slice(start, start + (pageSize as number));
+  }, [filteredProducts, currentPage, pageSize]);
+
   const hasActiveFilters = Boolean(onlyAvailable || minPrice || maxPrice);
 
   const resetFilters = () => {
@@ -49,6 +62,7 @@ export function SearchView({ initialQuery, initialProducts }: SearchViewProps) {
     setMinPrice("");
     setMaxPrice("");
     setSortBy("recientes");
+    setCurrentPage(1);
   };
 
   return (
@@ -156,14 +170,30 @@ export function SearchView({ initialQuery, initialProducts }: SearchViewProps) {
         </div>
       </div>
 
+      {/* Scroll anchor for pagination */}
+      <div id="search-products-top" className="scroll-mt-24" />
+
       {/* Results Grid */}
       {filteredProducts.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5">
-          {filteredProducts.map((product) => (
-            <div key={product.id} className="h-full">
-              <ProductCard product={product} />
-            </div>
-          ))}
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5">
+            {paginatedProducts.map((product) => (
+              <div key={product.id} className="h-full">
+                <ProductCard product={product} />
+              </div>
+            ))}
+          </div>
+
+          {/* Customer Pagination */}
+          <CustomerPagination
+            currentPage={currentPage}
+            totalItems={filteredProducts.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="artículos"
+            scrollTargetId="search-products-top"
+          />
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-[#F0E8F2] p-12 text-center space-y-4 max-w-lg mx-auto shadow-xs">

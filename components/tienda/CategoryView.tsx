@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ChevronRight, SlidersHorizontal, ArrowUpDown, X, Sparkles, Filter } from "lucide-react";
 import { Category, Product } from "@/types";
 import { isSubcategoryMatch } from "@/lib/subcategories";
 import { ProductCard } from "./ProductCard";
 import { CategorySidebar } from "./CategorySidebar";
+import { CustomerPagination, CustomerPageSizeOption } from "./CustomerPagination";
 
 interface CategoryViewProps {
   category: Category | null;
@@ -27,6 +28,13 @@ export function CategoryView({
   const [onlyAvailable, setOnlyAvailable] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<string>("recientes");
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<CustomerPageSizeOption>(20);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSubcategory, onlyAvailable, minPrice, maxPrice, sortBy]);
 
   // Available subcategories combining category configuration and actual product subcategories
   const availableSubcategories = useMemo(() => {
@@ -75,6 +83,13 @@ export function CategoryView({
       });
   }, [initialProducts, selectedSubcategory, onlyAvailable, minPrice, maxPrice, sortBy]);
 
+  // Paginated products slice
+  const paginatedProducts = useMemo(() => {
+    if (pageSize === "all") return filteredProducts;
+    const start = (currentPage - 1) * (pageSize as number);
+    return filteredProducts.slice(start, start + (pageSize as number));
+  }, [filteredProducts, currentPage, pageSize]);
+
   const hasActiveFilters = Boolean(minPrice || maxPrice || onlyAvailable || selectedSubcategory !== "todas");
 
   const resetFilters = () => {
@@ -83,6 +98,7 @@ export function CategoryView({
     setMaxPrice("");
     setOnlyAvailable(false);
     setSortBy("recientes");
+    setCurrentPage(1);
   };
 
   const categoryName = category?.name || (slug === "todos" ? "Todos los productos" : "Categoría");
@@ -296,14 +312,30 @@ export function CategoryView({
             </div>
           </div>
 
+          {/* Scroll anchor for pagination */}
+          <div id="catalog-products-top" className="scroll-mt-24" />
+
           {/* Products Grid */}
           {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4.5">
-              {filteredProducts.map((product) => (
-                <div key={product.id} className="h-full">
-                  <ProductCard product={product} />
-                </div>
-              ))}
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-3 sm:gap-4.5">
+                {paginatedProducts.map((product) => (
+                  <div key={product.id} className="h-full">
+                    <ProductCard product={product} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Customer Pagination */}
+              <CustomerPagination
+                currentPage={currentPage}
+                totalItems={filteredProducts.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                itemLabel="artículos"
+                scrollTargetId="catalog-products-top"
+              />
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-[#F0E8F2] p-12 text-center space-y-4">
