@@ -39,6 +39,7 @@ import {
   deleteOrderAction,
   createManualOrderAction,
 } from "@/app/actions/orders";
+import { ProductSearchCombobox } from "./ProductSearchCombobox";
 
 interface OrdersViewProps {
   initialOrders: Order[];
@@ -208,9 +209,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
     setEditItems((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleAddItemFromCatalog = () => {
-    if (!selectedProdToAdd) return;
-    const prod = products.find((p) => p.id === selectedProdToAdd);
+  const handleAddItemFromCatalog = (customProd?: Product) => {
+    const prod = customProd || products.find((p) => p.id === selectedProdToAdd);
     if (!prod) return;
 
     // Check if already in items
@@ -349,9 +349,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
     setCreateItems((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleCreateAddItemFromCatalog = () => {
-    if (!createSelectedProdToAdd) return;
-    const prod = products.find((p) => p.id === createSelectedProdToAdd);
+  const handleCreateAddItemFromCatalog = (customProd?: Product) => {
+    const prod = customProd || products.find((p) => p.id === createSelectedProdToAdd);
     if (!prod) return;
 
     const existingIndex = createItems.findIndex((i) => i.product_id === prod.id);
@@ -1182,30 +1181,22 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                   </div>
                 </div>
 
-                {/* Selector para agregar producto desde catálogo */}
+                {/* Selector para agregar producto desde catálogo con buscador y orden A-Z */}
                 {products.length > 0 && (
-                  <div className="flex items-center gap-2 p-3 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2]">
-                    <select
-                      value={selectedProdToAdd}
-                      onChange={(e) => setSelectedProdToAdd(e.target.value)}
-                      className="flex-1 p-2 rounded-xl bg-white border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8] text-xs"
-                    >
-                      <option value="">-- Seleccionar producto para agregar al pedido --</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({formatCOP(p.price)}) {p.stock <= 0 ? "- Sin stock" : `[${p.stock} disp.]`}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={handleAddItemFromCatalog}
-                      disabled={!selectedProdToAdd}
-                      className="px-3.5 py-2 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Agregar</span>
-                    </button>
+                  <div className="p-3 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-extrabold text-[#6D4BB8] uppercase tracking-wider">
+                        Buscar o agregar producto al pedido (A-Z)
+                      </span>
+                      <span className="text-[10px] text-[#7A7590]">
+                        {products.length} disponibles
+                      </span>
+                    </div>
+                    <ProductSearchCombobox
+                      products={products}
+                      onSelectProduct={(p) => handleAddItemFromCatalog(p)}
+                      placeholder="🔍 Escribe para buscar producto (ej: gorro, skala, óleo, champú)..."
+                    />
                   </div>
                 )}
 
@@ -1629,31 +1620,21 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                   </h3>
                 </div>
 
-                {/* Selector para agregar producto */}
-                <div className="p-3 bg-[#FAF5FB] rounded-2xl border border-[#F0E8F2] flex flex-col sm:flex-row gap-2 items-center">
-                  <div className="w-full sm:flex-1">
-                    <select
-                      value={createSelectedProdToAdd}
-                      onChange={(e) => setCreateSelectedProdToAdd(e.target.value)}
-                      className="w-full p-2 rounded-xl bg-white border border-[#F0E8F2] text-xs font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
-                    >
-                      <option value="">-- Seleccionar producto para agregar --</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} — {formatCOP(p.price)} (Stock: {p.stock})
-                        </option>
-                      ))}
-                    </select>
+                {/* Selector interactivo con buscador alfabético y similitud */}
+                <div className="p-3 bg-[#FAF5FB] rounded-2xl border border-[#F0E8F2] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold text-[#6D4BB8] uppercase tracking-wider">
+                      Buscar o agregar producto del catálogo (Orden A-Z)
+                    </span>
+                    <span className="text-[10px] text-[#7A7590]">
+                      {products.length} productos en catálogo
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!createSelectedProdToAdd}
-                    onClick={handleCreateAddItemFromCatalog}
-                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Agregar</span>
-                  </button>
+                  <ProductSearchCombobox
+                    products={products}
+                    onSelectProduct={(p) => handleCreateAddItemFromCatalog(p)}
+                    placeholder="🔍 Escribe para buscar producto (ej: gorro, skala, óleo, champú)..."
+                  />
                 </div>
 
                 {/* Lista de productos agregados */}
