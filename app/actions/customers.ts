@@ -254,8 +254,7 @@ export async function recordOrderCustomerAction(orderData: {
 
   // If no cédula provided, skip recording to prevent empty keys
   if (!cleanIdNumber) {
-    const fallback = getFallbackCustomers()[0];
-    return { isNew: false, customer: fallback };
+    return { isNew: false, customer: undefined as any };
   }
 
   try {

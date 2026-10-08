@@ -3,7 +3,6 @@ import { Customer } from "@/types";
 // In-memory store for customers fallback / development
 const globalForCustomers = global as unknown as {
   fallbackCustomers: Map<string, Customer>;
-  hasSeededCustomers: boolean;
 };
 
 export const fallbackCustomers =
@@ -11,99 +10,6 @@ export const fallbackCustomers =
 
 if (process.env.NODE_ENV !== "production") {
   globalForCustomers.fallbackCustomers = fallbackCustomers;
-}
-
-// Initial realistic seed customers for Alyshop
-const INITIAL_CUSTOMERS: Customer[] = [
-  {
-    id: "cust-1",
-    id_number: "1020789456",
-    name: "Carolina Gómez",
-    email: "carolina.gomez@gmail.com",
-    phone: "3105551234",
-    city: "Bogotá",
-    neighborhood: "Usaquén",
-    address: "Calle 140 # 11-45 Apto 502",
-    orders_count: 2,
-    total_spent: 178000,
-    first_order_date: "2026-09-15T14:20:00.000Z",
-    last_order_date: "2026-10-02T10:15:00.000Z",
-    notes: "Cliente recurrente. Interesada en novedades de hogar y cocina.",
-    created_at: "2026-09-15T14:20:00.000Z",
-  },
-  {
-    id: "cust-2",
-    id_number: "1032456789",
-    name: "Andrés Felipe Ramos",
-    email: "andres.ramos@hotmail.com",
-    phone: "3204445678",
-    city: "Medellín",
-    neighborhood: "El Poblado",
-    address: "Carrera 43A # 1-50",
-    orders_count: 1,
-    total_spent: 89900,
-    first_order_date: "2026-09-28T16:40:00.000Z",
-    last_order_date: "2026-09-28T16:40:00.000Z",
-    notes: "Prefiere envíos rápidos. Compró accesorios de tecnología.",
-    created_at: "2026-09-28T16:40:00.000Z",
-  },
-  {
-    id: "cust-3",
-    id_number: "1014238910",
-    name: "Valentina Morales",
-    email: "vale.morales@outlook.com",
-    phone: "3158889900",
-    city: "Cali",
-    neighborhood: "Granada",
-    address: "Avenida 9N # 14-22",
-    orders_count: 3,
-    total_spent: 245000,
-    first_order_date: "2026-08-20T11:00:00.000Z",
-    last_order_date: "2026-10-05T18:30:00.000Z",
-    notes: "Cliente VIP. Excelente respuesta a promociones de belleza.",
-    created_at: "2026-08-20T11:00:00.000Z",
-  },
-  {
-    id: "cust-4",
-    id_number: "52987123",
-    name: "Sofía Rodríguez",
-    email: "sofia.rodriguez@gmail.com",
-    phone: "3001234567",
-    city: "Bogotá",
-    neighborhood: "Chapinero",
-    address: "Carrera 7 # 60-15 Casa 4",
-    orders_count: 1,
-    total_spent: 54900,
-    first_order_date: "2026-10-04T09:12:00.000Z",
-    last_order_date: "2026-10-04T09:12:00.000Z",
-    notes: "Nueva clienta. Llegó por recomendación.",
-    created_at: "2026-10-04T09:12:00.000Z",
-  },
-  {
-    id: "cust-5",
-    id_number: "1000543219",
-    name: "Mateo Herrera",
-    email: "mateo.h@yahoo.com",
-    phone: "3189991122",
-    city: "Bucaramanga",
-    neighborhood: "Cabecera del Llano",
-    address: "Calle 48 # 33-10 Apto 901",
-    orders_count: 1,
-    total_spent: 120000,
-    first_order_date: "2026-10-06T15:45:00.000Z",
-    last_order_date: "2026-10-06T15:45:00.000Z",
-    notes: "Interesado en productos de mascotas y deportes.",
-    created_at: "2026-10-06T15:45:00.000Z",
-  },
-];
-
-// Initialize seed data once
-if (!globalForCustomers.hasSeededCustomers && fallbackCustomers.size === 0) {
-  for (const c of INITIAL_CUSTOMERS) {
-    fallbackCustomers.set(c.id, c);
-    fallbackCustomers.set(normalizeIdNumber(c.id_number), c);
-  }
-  globalForCustomers.hasSeededCustomers = true;
 }
 
 export function normalizeIdNumber(idNumber: string): string {
