@@ -83,8 +83,8 @@ export default async function OrderPage({
 *Pedido:* ${order.code}
 *Fecha:* ${dateFormatted}
 -----------------------------
-*Cliente:* ${order.customer_name}
-*Celular:* ${order.customer_phone}
+*Cliente:* ${order.customer_name}${order.customer_id_number ? `\n*Cédula / Documento:* ${order.customer_id_number}` : ""}
+*Celular:* ${order.customer_phone}${order.customer_email ? `\n*Correo electrónico:* ${order.customer_email}` : ""}
 *Ciudad:* ${order.city}
 *Dirección:* ${order.address}, Barrio ${order.neighborhood}
 *Entrega:* ${order.delivery_method === "envio" ? "Envío a domicilio" : "Recoger en punto"}

@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS public.orders (
   public_token TEXT NOT NULL UNIQUE, -- Token aleatorio seguro para consultar factura sin predecir
   customer_name TEXT NOT NULL,
   customer_phone TEXT NOT NULL,
+  customer_email TEXT,
+  customer_id_number TEXT,
   city TEXT NOT NULL,
   neighborhood TEXT NOT NULL,
   address TEXT NOT NULL,
@@ -179,6 +181,29 @@ CREATE TRIGGER update_settings_updated_at
   BEFORE UPDATE ON public.settings
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
+-- 3.10 CUSTOMERS (Directorio de clientes registrados para mercadeo y publicidad)
+CREATE TABLE IF NOT EXISTS public.customers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_number TEXT NOT NULL UNIQUE, -- Cédula / Documento de Identidad (clave única para evitar duplicados)
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT NOT NULL,
+  city TEXT NOT NULL DEFAULT 'Bogotá',
+  neighborhood TEXT,
+  address TEXT,
+  orders_count INT NOT NULL DEFAULT 1 CHECK (orders_count >= 0),
+  total_spent NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (total_spent >= 0),
+  first_order_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_order_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER update_customers_updated_at
+  BEFORE UPDATE ON public.customers
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
 -- ==============================================================================
 -- 4. ÍNDICES DE RENDIMIENTO
 -- ==============================================================================
@@ -196,6 +221,10 @@ CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders(created_at DES
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_movements_product ON public.inventory_movements(product_id);
 CREATE INDEX IF NOT EXISTS idx_banners_is_active ON public.banners(is_active);
+CREATE INDEX IF NOT EXISTS idx_customers_id_number ON public.customers(id_number);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON public.customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON public.customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_created_at ON public.customers(created_at DESC);
 
 -- ==============================================================================
 -- 5. FUNCIÓN TRANSACCIONAL RPC: create_order
@@ -210,7 +239,9 @@ CREATE OR REPLACE FUNCTION public.create_order(
   p_delivery_method TEXT,
   p_notes TEXT,
   p_shipping_cost NUMERIC,
-  p_items JSONB -- Array de objetos: [{ "product_id": uuid, "quantity": int }]
+  p_items JSONB, -- Array de objetos: [{ "product_id": uuid, "quantity": int }]
+  p_customer_email TEXT DEFAULT NULL,
+  p_customer_id_number TEXT DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -277,6 +308,8 @@ BEGIN
     public_token,
     customer_name,
     customer_phone,
+    customer_email,
+    customer_id_number,
     city,
     neighborhood,
     address,
@@ -291,6 +324,8 @@ BEGIN
     v_public_token,
     p_customer_name,
     p_customer_phone,
+    NULLIF(trim(p_customer_email), ''),
+    NULLIF(trim(p_customer_id_number), ''),
     p_city,
     p_neighborhood,
     p_address,
@@ -301,6 +336,46 @@ BEGIN
     v_total,
     'pendiente'
   ) RETURNING id INTO v_order_id;
+
+  -- 5.1 Registrar o actualizar cliente por cédula para mercadeo y publicidad
+  IF p_customer_id_number IS NOT NULL AND trim(p_customer_id_number) <> '' THEN
+    INSERT INTO public.customers (
+      id_number,
+      name,
+      email,
+      phone,
+      city,
+      neighborhood,
+      address,
+      orders_count,
+      total_spent,
+      first_order_date,
+      last_order_date
+    ) VALUES (
+      trim(p_customer_id_number),
+      p_customer_name,
+      NULLIF(trim(p_customer_email), ''),
+      p_customer_phone,
+      p_city,
+      p_neighborhood,
+      p_address,
+      1,
+      v_total,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (id_number) DO UPDATE SET
+      name = EXCLUDED.name,
+      email = COALESCE(NULLIF(EXCLUDED.email, ''), public.customers.email),
+      phone = EXCLUDED.phone,
+      city = EXCLUDED.city,
+      neighborhood = COALESCE(EXCLUDED.neighborhood, public.customers.neighborhood),
+      address = COALESCE(EXCLUDED.address, public.customers.address),
+      orders_count = public.customers.orders_count + 1,
+      total_spent = public.customers.total_spent + EXCLUDED.total_spent,
+      last_order_date = NOW(),
+      updated_at = NOW();
+  END IF;
 
   -- 6. Insertar items del pedido con snapshot de nombre y precio
   FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(product_id UUID, quantity INT)
@@ -358,6 +433,7 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
@@ -433,6 +509,11 @@ CREATE POLICY "Admins tienen acceso total a orders"
 
 CREATE POLICY "Admins tienen acceso total a order_items"
   ON public.order_items FOR ALL
+  USING (public.is_admin());
+
+-- 6.8 POLÍTICAS PARA CUSTOMERS (Base de datos publicitaria)
+CREATE POLICY "Admins tienen acceso total a customers"
+  ON public.customers FOR ALL
   USING (public.is_admin());
 
 -- 6.8 POLÍTICAS PARA INVENTORY_MOVEMENTS

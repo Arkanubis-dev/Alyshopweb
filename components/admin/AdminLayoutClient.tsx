@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { Logo } from "@/components/tienda/Logo";
 import { logoutAdminAction } from "@/app/actions/auth";
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { name: "Categorías", href: "/admin/categorias", icon: FolderTree },
   { name: "Inventario", href: "/admin/inventario", icon: Boxes },
   { name: "Pedidos", href: "/admin/pedidos", icon: ShoppingBag },
+  { name: "Clientes", href: "/admin/clientes", icon: Users },
   { name: "Banners", href: "/admin/banners", icon: ImageIcon },
   { name: "Ajustes", href: "/admin/ajustes", icon: Settings },
 ];

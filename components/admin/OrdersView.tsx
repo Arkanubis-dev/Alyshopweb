@@ -27,6 +27,8 @@ import {
   Plus,
   Minus,
   Eye,
+  Mail,
+  CreditCard,
 } from "lucide-react";
 import { Order, OrderStatus, Product } from "@/types";
 import { formatCOP } from "@/lib/utils";
@@ -69,6 +71,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editCustomerName, setEditCustomerName] = useState("");
   const [editCustomerPhone, setEditCustomerPhone] = useState("");
+  const [editCustomerEmail, setEditCustomerEmail] = useState("");
+  const [editCustomerIdNumber, setEditCustomerIdNumber] = useState("");
   const [editCity, setEditCity] = useState("");
   const [editNeighborhood, setEditNeighborhood] = useState("");
   const [editAddress, setEditAddress] = useState("");
@@ -89,6 +93,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createCustomerName, setCreateCustomerName] = useState("");
   const [createCustomerPhone, setCreateCustomerPhone] = useState("");
+  const [createCustomerEmail, setCreateCustomerEmail] = useState("");
+  const [createCustomerIdNumber, setCreateCustomerIdNumber] = useState("");
   const [createCity, setCreateCity] = useState("Bogotá");
   const [createNeighborhood, setCreateNeighborhood] = useState("");
   const [createAddress, setCreateAddress] = useState("");
@@ -116,6 +122,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
         o.code.toLowerCase().includes(q) ||
         o.customer_name.toLowerCase().includes(q) ||
         o.customer_phone.includes(q) ||
+        (o.customer_email && o.customer_email.toLowerCase().includes(q)) ||
+        (o.customer_id_number && o.customer_id_number.includes(q)) ||
         o.city.toLowerCase().includes(q)
       );
     }
@@ -161,6 +169,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
     setEditingOrder(order);
     setEditCustomerName(order.customer_name);
     setEditCustomerPhone(order.customer_phone);
+    setEditCustomerEmail(order.customer_email || "");
+    setEditCustomerIdNumber(order.customer_id_number || "");
     setEditCity(order.city);
     setEditNeighborhood(order.neighborhood);
     setEditAddress(order.address);
@@ -245,6 +255,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
       const res = await updateFullOrderAction(editingOrder.id, {
         customer_name: editCustomerName.trim(),
         customer_phone: editCustomerPhone.trim(),
+        customer_email: editCustomerEmail.trim() || undefined,
+        customer_id_number: editCustomerIdNumber.trim() || undefined,
         city: editCity.trim(),
         neighborhood: editNeighborhood.trim(),
         address: editAddress.trim(),
@@ -381,6 +393,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
       const res = await createManualOrderAction({
         customer_name: createCustomerName.trim(),
         customer_phone: createCustomerPhone.trim(),
+        customer_email: createCustomerEmail.trim() || undefined,
+        customer_id_number: createCustomerIdNumber.trim() || undefined,
         city: createCity.trim() || "Bogotá",
         neighborhood: createNeighborhood.trim(),
         address:
@@ -619,7 +633,17 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                     {/* Cliente */}
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-[#2E2A3B]">{order.customer_name}</div>
-                      <div className="text-[11px] text-[#7A7590]">{order.customer_phone}</div>
+                      <div className="text-[11px] text-[#7A7590] flex items-center gap-1.5 flex-wrap">
+                        <span>{order.customer_phone}</span>
+                        {order.customer_id_number && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-[#FAF5FC] text-[#6D4BB8] font-medium text-[10px]">
+                            C.C. {order.customer_id_number}
+                          </span>
+                        )}
+                      </div>
+                      {order.customer_email && (
+                        <div className="text-[11px] text-[#6D4BB8] truncate max-w-[180px]">{order.customer_email}</div>
+                      )}
                     </td>
 
                     {/* Fecha */}
@@ -836,10 +860,22 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                     <User className="w-4 h-4 text-[#7A7590]" />
                     <span className="font-bold text-[#2E2A3B]">{selectedOrder.customer_name}</span>
                   </div>
+                  {selectedOrder.customer_id_number && (
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-[#7A7590]" />
+                      <span className="text-[#2E2A3B]">Cédula: <strong>{selectedOrder.customer_id_number}</strong></span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-[#7A7590]" />
                     <span className="text-[#2E2A3B]">{selectedOrder.customer_phone}</span>
                   </div>
+                  {selectedOrder.customer_email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-[#7A7590]" />
+                      <span className="text-[#2E2A3B]">{selectedOrder.customer_email}</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-[#7A7590]" />
                     <span className="text-[#2E2A3B]">
@@ -1024,6 +1060,19 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
 
                   <div>
                     <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Cédula / Documento de Identidad
+                    </label>
+                    <input
+                      type="text"
+                      value={editCustomerIdNumber}
+                      onChange={(e) => setEditCustomerIdNumber(e.target.value)}
+                      placeholder="Ej: 1020789456"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
                       Teléfono / WhatsApp *
                     </label>
                     <input
@@ -1031,6 +1080,19 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                       value={editCustomerPhone}
                       onChange={(e) => setEditCustomerPhone(e.target.value)}
                       placeholder="Ej: 300 123 4567"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      value={editCustomerEmail}
+                      onChange={(e) => setEditCustomerEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
                       className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
                     />
                   </div>
@@ -1448,6 +1510,19 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
 
                   <div>
                     <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Cédula / Documento de Identidad
+                    </label>
+                    <input
+                      type="text"
+                      value={createCustomerIdNumber}
+                      onChange={(e) => setCreateCustomerIdNumber(e.target.value)}
+                      placeholder="Ej: 1020789456 (Identifica clientes nuevos)"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
                       Celular / WhatsApp *
                     </label>
                     <input
@@ -1456,6 +1531,19 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                       value={createCustomerPhone}
                       onChange={(e) => setCreateCustomerPhone(e.target.value)}
                       placeholder="Ej: 3001234567"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Correo Electrónico (Para publicidad)
+                    </label>
+                    <input
+                      type="email"
+                      value={createCustomerEmail}
+                      onChange={(e) => setCreateCustomerEmail(e.target.value)}
+                      placeholder="Ej: cliente@correo.com"
                       className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
                     />
                   </div>

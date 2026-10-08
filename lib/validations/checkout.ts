@@ -11,6 +11,16 @@ export const checkoutSchema = z.object({
       /^3[0-9]{9}$/,
       "Ingresa un número celular colombiano válido de 10 dígitos (ej. 3001234567)"
     ),
+  customer_email: z
+    .string()
+    .min(1, "Por favor ingresa tu correo electrónico")
+    .email("Ingresa un correo electrónico válido (ej. usuario@gmail.com)")
+    .max(100, "El correo electrónico es demasiado largo"),
+  customer_id_number: z
+    .string()
+    .min(5, "Por favor ingresa un número de cédula o documento válido")
+    .max(20, "El número de documento no puede exceder 20 caracteres")
+    .regex(/^[0-9a-zA-Z\s.-]+$/, "Ingresa un número de identificación válido"),
   city: z
     .string()
     .min(2, "Por favor ingresa tu ciudad o municipio")

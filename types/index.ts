@@ -71,6 +71,8 @@ export interface Order {
   public_token: string;
   customer_name: string;
   customer_phone: string;
+  customer_email?: string;
+  customer_id_number?: string;
   city: string;
   neighborhood: string;
   address: string;
@@ -88,6 +90,8 @@ export interface Order {
 export interface UpdateOrderInput {
   customer_name?: string;
   customer_phone?: string;
+  customer_email?: string;
+  customer_id_number?: string;
   city?: string;
   neighborhood?: string;
   address?: string;
@@ -110,11 +114,52 @@ export interface UpdateOrderInput {
 export interface CheckoutFormData {
   customer_name: string;
   customer_phone: string;
+  customer_email: string;
+  customer_id_number: string;
   city: string;
   neighborhood: string;
   address: string;
   indications?: string;
   delivery_method: "envio" | "recoger";
+  notes?: string;
+}
+
+export interface Customer {
+  id: string;
+  id_number: string; // Cédula o documento de identidad único
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  neighborhood?: string;
+  address?: string;
+  orders_count: number;
+  total_spent: number;
+  first_order_date: string;
+  last_order_date?: string;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CreateCustomerInput {
+  id_number: string;
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  neighborhood?: string;
+  address?: string;
+  notes?: string;
+}
+
+export interface UpdateCustomerInput {
+  name?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  neighborhood?: string;
+  address?: string;
   notes?: string;
 }
 

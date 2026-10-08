@@ -18,6 +18,8 @@ import {
   Loader2,
   ChevronRight,
   ShieldCheck,
+  Mail,
+  CreditCard,
 } from "lucide-react";
 import { checkoutSchema, CheckoutSchemaType } from "@/lib/validations/checkout";
 import { createOrderAction } from "@/app/actions/order";
@@ -47,7 +49,9 @@ export function CheckoutView() {
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
       customer_name: "",
+      customer_id_number: "",
       customer_phone: "",
+      customer_email: "",
       city: "Bogotá",
       neighborhood: "",
       address: "",
@@ -167,8 +171,9 @@ export function CheckoutView() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Nombre */}
                 <div className="space-y-1">
-                  <label htmlFor="customer_name" className="text-xs font-semibold text-[#2E2A3B]">
-                    Nombre y apellido completo *
+                  <label htmlFor="customer_name" className="text-xs font-semibold text-[#2E2A3B] flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-[#6D4BB8]" />
+                    <span>Nombre y apellido completo *</span>
                   </label>
                   <input
                     id="customer_name"
@@ -184,10 +189,34 @@ export function CheckoutView() {
                   )}
                 </div>
 
+                {/* Cédula / Documento */}
+                <div className="space-y-1">
+                  <label htmlFor="customer_id_number" className="text-xs font-semibold text-[#2E2A3B] flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-[#6D4BB8]" />
+                      <span>Cédula / Documento de identidad *</span>
+                    </span>
+                    <span className="text-[10px] text-[#7A7590] font-normal">Identificación</span>
+                  </label>
+                  <input
+                    id="customer_id_number"
+                    type="text"
+                    {...register("customer_id_number")}
+                    placeholder="Ej: 1020789456"
+                    className="w-full text-xs sm:text-sm p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] focus:outline-none focus:border-[#F472A8] focus:ring-2 focus:ring-[#FCE4EF]"
+                  />
+                  {errors.customer_id_number && (
+                    <p className="text-[11px] text-red-500 font-medium">
+                      {errors.customer_id_number.message}
+                    </p>
+                  )}
+                </div>
+
                 {/* Celular */}
                 <div className="space-y-1">
-                  <label htmlFor="customer_phone" className="text-xs font-semibold text-[#2E2A3B]">
-                    Celular (WhatsApp de contacto) *
+                  <label htmlFor="customer_phone" className="text-xs font-semibold text-[#2E2A3B] flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-[#25D366]" />
+                    <span>Celular (WhatsApp de contacto) *</span>
                   </label>
                   <div className="relative flex items-center">
                     <span className="absolute left-3 text-xs text-[#7A7590] font-semibold">
@@ -205,6 +234,29 @@ export function CheckoutView() {
                   {errors.customer_phone && (
                     <p className="text-[11px] text-red-500 font-medium">
                       {errors.customer_phone.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Correo Electrónico */}
+                <div className="space-y-1">
+                  <label htmlFor="customer_email" className="text-xs font-semibold text-[#2E2A3B] flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-[#6D4BB8]" />
+                      <span>Correo electrónico *</span>
+                    </span>
+                    <span className="text-[10px] text-[#7A7590] font-normal">Para comprobante</span>
+                  </label>
+                  <input
+                    id="customer_email"
+                    type="email"
+                    {...register("customer_email")}
+                    placeholder="Ej: tuemail@ejemplo.com"
+                    className="w-full text-xs sm:text-sm p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] focus:outline-none focus:border-[#F472A8] focus:ring-2 focus:ring-[#FCE4EF]"
+                  />
+                  {errors.customer_email && (
+                    <p className="text-[11px] text-red-500 font-medium">
+                      {errors.customer_email.message}
                     </p>
                   )}
                 </div>

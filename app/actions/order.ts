@@ -7,6 +7,7 @@ import { MOCK_PRODUCTS } from "@/lib/mock-data";
 import { formatCOP } from "@/lib/utils";
 import { Order, OrderItem } from "@/types";
 import { saveFallbackOrder } from "@/lib/orders-cache";
+import { recordOrderCustomerAction } from "./customers";
 import crypto from "crypto";
 
 interface CartInputItem {
@@ -78,6 +79,8 @@ export async function createOrderAction(
       const { data: rpcResult, error: rpcError } = await supabase.rpc("create_order", {
         p_customer_name: data.customer_name,
         p_customer_phone: data.customer_phone,
+        p_customer_email: data.customer_email,
+        p_customer_id_number: data.customer_id_number,
         p_city: data.city,
         p_neighborhood: data.neighborhood,
         p_address: fullAddress,
@@ -93,12 +96,26 @@ export async function createOrderAction(
         const subtotal = Number(rpcResult.subtotal);
         const total = Number(rpcResult.total);
 
+        // Registrar cliente (nuevo o actualización) para futuras campañas publicitarias
+        await recordOrderCustomerAction({
+          id_number: data.customer_id_number,
+          name: data.customer_name,
+          email: data.customer_email,
+          phone: data.customer_phone,
+          city: data.city,
+          neighborhood: data.neighborhood,
+          address: fullAddress,
+          total,
+        });
+
         // Construir mensaje de WhatsApp según el formato exacto requerido
         const whatsappMessage = buildWhatsAppMessage({
           orderCode,
           dateFormatted,
           customerName: data.customer_name,
           customerPhone: data.customer_phone,
+          customerEmail: data.customer_email,
+          customerIdNumber: data.customer_id_number,
           city: data.city,
           address: fullAddress,
           neighborhood: data.neighborhood,
@@ -167,6 +184,8 @@ export async function createOrderAction(
       public_token: publicToken,
       customer_name: data.customer_name,
       customer_phone: data.customer_phone,
+      customer_email: data.customer_email,
+      customer_id_number: data.customer_id_number,
       city: data.city,
       neighborhood: data.neighborhood,
       address: fullAddress,
@@ -182,11 +201,25 @@ export async function createOrderAction(
 
     saveFallbackOrder(newOrder);
 
+    // Registrar cliente en base de datos publicitaria
+    await recordOrderCustomerAction({
+      id_number: data.customer_id_number,
+      name: data.customer_name,
+      email: data.customer_email,
+      phone: data.customer_phone,
+      city: data.city,
+      neighborhood: data.neighborhood,
+      address: fullAddress,
+      total,
+    });
+
     const whatsappMessage = buildWhatsAppMessage({
       orderCode,
       dateFormatted,
       customerName: data.customer_name,
       customerPhone: data.customer_phone,
+      customerEmail: data.customer_email,
+      customerIdNumber: data.customer_id_number,
       city: data.city,
       address: fullAddress,
       neighborhood: data.neighborhood,
@@ -223,6 +256,8 @@ function buildWhatsAppMessage({
   dateFormatted,
   customerName,
   customerPhone,
+  customerEmail,
+  customerIdNumber,
   city,
   address,
   neighborhood,
@@ -237,6 +272,8 @@ function buildWhatsAppMessage({
   dateFormatted: string;
   customerName: string;
   customerPhone: string;
+  customerEmail: string;
+  customerIdNumber: string;
   city: string;
   address: string;
   neighborhood: string;
@@ -261,7 +298,9 @@ function buildWhatsAppMessage({
 *Fecha:* ${dateFormatted}
 -----------------------------
 *Cliente:* ${customerName}
+*Cédula / Documento:* ${customerIdNumber}
 *Celular:* ${customerPhone}
+*Correo electrónico:* ${customerEmail}
 *Ciudad:* ${city}
 *Dirección:* ${address}, Barrio ${neighborhood}
 *Entrega:* ${deliveryText}

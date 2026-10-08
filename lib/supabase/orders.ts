@@ -37,6 +37,8 @@ export async function getOrderByCodeAndToken(
           public_token: data.public_token,
           customer_name: data.customer_name,
           customer_phone: data.customer_phone,
+          customer_email: data.customer_email,
+          customer_id_number: data.customer_id_number,
           city: data.city,
           neighborhood: data.neighborhood,
           address: data.address,

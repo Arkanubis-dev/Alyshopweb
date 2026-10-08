@@ -7,6 +7,7 @@ import { Order, OrderStatus, UpdateOrderInput } from "@/types";
 import { fallbackOrders, removeFallbackOrder, saveFallbackOrder } from "@/lib/orders-cache";
 import { updateProductStockAction } from "./inventory";
 import { getAllAdminProducts } from "./products";
+import { recordOrderCustomerAction } from "./customers";
 
 export async function getAllAdminOrdersAction(): Promise<Order[]> {
   try {
@@ -27,6 +28,8 @@ export async function getAllAdminOrdersAction(): Promise<Order[]> {
           public_token: d.public_token,
           customer_name: d.customer_name,
           customer_phone: d.customer_phone,
+          customer_email: d.customer_email,
+          customer_id_number: d.customer_id_number,
           city: d.city,
           neighborhood: d.neighborhood,
           address: d.address,
@@ -254,6 +257,8 @@ export async function updateFullOrderAction(
       const updatePayload: Record<string, any> = {
         customer_name: input.customer_name ?? order.customer_name,
         customer_phone: input.customer_phone ?? order.customer_phone,
+        customer_email: input.customer_email !== undefined ? input.customer_email : order.customer_email,
+        customer_id_number: input.customer_id_number !== undefined ? input.customer_id_number : order.customer_id_number,
         city: input.city ?? order.city,
         neighborhood: input.neighborhood ?? order.neighborhood,
         address: input.address ?? order.address,
@@ -280,6 +285,8 @@ export async function updateFullOrderAction(
       ...order,
       customer_name: input.customer_name ?? order.customer_name,
       customer_phone: input.customer_phone ?? order.customer_phone,
+      customer_email: input.customer_email !== undefined ? input.customer_email : order.customer_email,
+      customer_id_number: input.customer_id_number !== undefined ? input.customer_id_number : order.customer_id_number,
       city: input.city ?? order.city,
       neighborhood: input.neighborhood ?? order.neighborhood,
       address: input.address ?? order.address,
@@ -353,6 +360,8 @@ export interface CreateManualOrderItemInput {
 export interface CreateManualOrderInput {
   customer_name: string;
   customer_phone: string;
+  customer_email?: string;
+  customer_id_number?: string;
   city: string;
   neighborhood: string;
   address: string;
@@ -438,6 +447,8 @@ export async function createManualOrderAction(
         public_token: publicToken,
         customer_name: input.customer_name.trim(),
         customer_phone: input.customer_phone.trim(),
+        customer_email: input.customer_email?.trim() || null,
+        customer_id_number: input.customer_id_number?.trim() || null,
         city: input.city.trim() || "Bogotá",
         neighborhood: input.neighborhood.trim() || "General",
         address: input.address.trim() || "Entrega acordada",
@@ -501,6 +512,8 @@ export async function createManualOrderAction(
       public_token: publicToken,
       customer_name: input.customer_name.trim(),
       customer_phone: input.customer_phone.trim(),
+      customer_email: input.customer_email?.trim() || undefined,
+      customer_id_number: input.customer_id_number?.trim() || undefined,
       city: input.city.trim() || "Bogotá",
       neighborhood: input.neighborhood.trim() || "General",
       address: input.address.trim() || "Entrega acordada",
@@ -516,6 +529,20 @@ export async function createManualOrderAction(
     };
 
     saveFallbackOrder(createdOrder);
+
+    // Si se especificó cédula, registrar al cliente en la base de datos publicitaria
+    if (input.customer_id_number?.trim()) {
+      await recordOrderCustomerAction({
+        id_number: input.customer_id_number.trim(),
+        name: input.customer_name.trim(),
+        email: input.customer_email?.trim() || "",
+        phone: input.customer_phone.trim(),
+        city: input.city.trim() || "Bogotá",
+        neighborhood: input.neighborhood?.trim(),
+        address: input.address?.trim(),
+        total,
+      });
+    }
 
     revalidatePath("/admin/pedidos");
     revalidatePath("/admin");
