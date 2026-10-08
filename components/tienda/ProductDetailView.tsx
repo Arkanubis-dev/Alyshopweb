@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Heart,
   ShoppingBag,
@@ -37,6 +38,7 @@ export function ProductDetailView({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
+  const router = useRouter();
 
   const addItem = useCartStore((state) => state.addItem);
   const isFavorite = useFavoritesStore((state) => state.isFavorite(product.id));
@@ -65,6 +67,12 @@ export function ProductDetailView({
       setAddedAnimation(true);
       setTimeout(() => setAddedAnimation(false), 1500);
     }
+  };
+
+  const handleBuyNow = () => {
+    if (isOutOfStock) return;
+    addItem(product, quantity);
+    router.push("/checkout");
   };
 
   // Direct WhatsApp order link for this specific product
@@ -326,15 +334,27 @@ export function ProductDetailView({
                     )}
                   </button>
 
-                  {/* Button 2: Pedir por WhatsApp directo */}
+                  {/* Button 2: Comprar ahora y llenar datos de entrega */}
+                  <button
+                    type="button"
+                    onClick={handleBuyNow}
+                    className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <MessageCircle className="w-5 h-5 fill-white" />
+                    <span>Comprar ahora (Pedir por WhatsApp)</span>
+                  </button>
+                </div>
+
+                {/* Direct question consultation */}
+                <div className="text-center pt-1">
                   <a
                     href={whatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white transition-all duration-200 shadow-sm active:scale-95"
+                    className="inline-flex items-center gap-1.5 text-xs text-[#7A7590] hover:text-[#25D366] transition-colors"
                   >
-                    <MessageCircle className="w-5 h-5 fill-white" />
-                    <span>Pedir por WhatsApp</span>
+                    <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                    <span>¿Tienes dudas antes de comprar? Chatea con una asesora</span>
                   </a>
                 </div>
               </div>

@@ -205,7 +205,7 @@ export function CartView() {
               href="/checkout"
               className="w-full py-3.5 px-6 rounded-2xl bg-[#F472A8] hover:bg-[#E35E96] text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95"
             >
-              <span>Continuar con mi pedido</span>
+              <span>Finalizar compra (Ingresar datos)</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 

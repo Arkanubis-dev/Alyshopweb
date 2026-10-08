@@ -133,7 +133,7 @@ export function CheckoutView() {
           Carrito
         </Link>
         <ChevronRight className="w-3.5 h-3.5 text-[#7A7590]/50" />
-        <span className="font-semibold text-[#6D4BB8]">Finalizar Pedido</span>
+        <span className="font-semibold text-[#6D4BB8]">Finalizar Compra</span>
       </nav>
 
       {/* Server Error Alert */}
@@ -154,19 +154,22 @@ export function CheckoutView() {
           <div className="lg:col-span-7 bg-white rounded-3xl border border-[#F0E8F2] shadow-xs p-5 sm:p-8 space-y-6">
             <div>
               <h1 className="text-xl sm:text-2xl font-extrabold text-[#2E2A3B] tracking-tight">
-                Datos de Entrega y Contacto
+                Finalizar Compra
               </h1>
               <p className="text-xs sm:text-sm text-[#7A7590] mt-1">
-                Completa tus datos para coordinar el despacho por WhatsApp. No cobramos en línea.
+                Ingresa tus datos personales (Cédula, Correo, Celular y Dirección) para registrar tu pedido y enviar la confirmación por WhatsApp.
               </p>
             </div>
 
             {/* Personal Data */}
             <div className="space-y-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8] flex items-center gap-2">
-                <User className="w-4 h-4" />
-                <span>1. Información de contacto</span>
-              </h2>
+              <div className="flex items-center justify-between pb-1 border-b border-[#F0E8F2]">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8] flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  <span>1. Datos del Cliente (Cédula, Correo y Celular)</span>
+                </h2>
+                <span className="text-[11px] text-[#F472A8] font-bold">* Obligatorios</span>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Nombre */}
