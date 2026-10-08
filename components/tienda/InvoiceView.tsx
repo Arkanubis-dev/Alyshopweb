@@ -66,6 +66,11 @@ export function InvoiceView({ order, whatsappUrl }: InvoiceViewProps) {
       bg: "bg-rose-50 text-rose-800 border-rose-200",
       icon: Clock,
     },
+    ajuste_anterior: {
+      label: "Ajuste Anterior (Histórico)",
+      bg: "bg-amber-100/90 text-amber-950 border-amber-300",
+      icon: Package,
+    },
   }[order.status] || {
     label: order.status,
     bg: "bg-gray-50 text-gray-800 border-gray-200",

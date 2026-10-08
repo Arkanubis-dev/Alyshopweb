@@ -29,6 +29,7 @@ import {
   Eye,
   Mail,
   CreditCard,
+  Archive,
 } from "lucide-react";
 import { Order, OrderStatus, Product } from "@/types";
 import { formatCOP } from "@/lib/utils";
@@ -157,6 +158,12 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
         return { label: "Entregado", bg: "bg-emerald-50 text-emerald-800 border-emerald-200", icon: Package };
       case "cancelado":
         return { label: "Cancelado", bg: "bg-rose-50 text-rose-800 border-rose-200", icon: XCircle };
+      case "ajuste_anterior":
+        return {
+          label: "Ajuste Anterior (Histórico)",
+          bg: "bg-amber-100/90 text-amber-950 border-amber-300",
+          icon: Archive,
+        };
     }
   };
 
@@ -526,6 +533,11 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
           `Hola ${order.customer_name}. Te confirmamos que tu pedido *${order.code}* en alyshop ha sido cancelado.\n\n` +
           `Si tienes alguna pregunta, con gusto te atendemos por aquí.`;
         break;
+      case "ajuste_anterior":
+        message =
+          `Hola ${order.customer_name}! 📋 Tu pedido *${order.code}* en alyshop ha sido registrado en nuestro sistema como ajuste de pedido anterior.\n\n` +
+          `¡Muchas gracias por tu preferencia!`;
+        break;
     }
 
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
@@ -598,6 +610,7 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
             <option value="enviado">Enviados</option>
             <option value="entregado">Entregados</option>
             <option value="cancelado">Cancelados</option>
+            <option value="ajuste_anterior">Ajuste de pedido anterior (Histórico)</option>
           </select>
         </div>
       </div>
@@ -832,11 +845,12 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                     <option value="enviado">Enviado (En camino al cliente)</option>
                     <option value="entregado">Entregado con éxito</option>
                     <option value="cancelado">Cancelado (Reintegra stock a bodega)</option>
+                    <option value="ajuste_anterior">Ajuste de pedido anterior (Histórico - No modifica stock)</option>
                   </select>
                 </div>
                 <p className="text-[11px] text-[#7A7590]">
-                  💡 <em>Regla de inventario:</em> Al marcar como &quot;confirmado&quot;, el sistema descuenta
-                  automáticamente las existencias del catálogo.
+                  💡 <em>Regla de inventario:</em> &quot;Confirmado&quot; descuenta existencias; &quot;Ajuste de pedido anterior&quot;
+                  registra histórico ya facturado sin descontar ni reintegrar existencias.
                 </p>
               </div>
 
@@ -1163,6 +1177,7 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                       <option value="enviado">Enviado</option>
                       <option value="entregado">Entregado</option>
                       <option value="cancelado">Cancelado</option>
+                      <option value="ajuste_anterior">Ajuste de pedido anterior (Histórico - No modifica stock)</option>
                     </select>
                   </div>
                 </div>
@@ -1602,12 +1617,25 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                       className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
                     >
                       <option value="confirmado">Confirmado (Descuenta Stock)</option>
+                      <option value="ajuste_anterior">Ajuste de pedido anterior (Histórico - No descuenta stock)</option>
                       <option value="pendiente">Pendiente de Pago</option>
                       <option value="enviado">Enviado</option>
                       <option value="entregado">Entregado</option>
                       <option value="cancelado">Cancelado</option>
                     </select>
                   </div>
+
+                  {createStatus === "ajuste_anterior" && (
+                    <div className="sm:col-span-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                      <div>
+                        <p className="font-bold">Modo: Ajuste de Pedido Anterior (Histórico)</p>
+                        <p className="text-[11px] text-amber-800/90 leading-relaxed mt-0.5">
+                          Ideal para subir ventas ya facturadas con anterioridad. <strong>No creará ni descontará existencias del inventario</strong>, y te permite agregar productos aunque figuren con 0 unidades disponibles sin alterar el stock de tu tienda.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

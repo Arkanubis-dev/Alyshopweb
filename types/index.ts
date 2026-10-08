@@ -63,7 +63,8 @@ export type OrderStatus =
   | "confirmado"
   | "enviado"
   | "entregado"
-  | "cancelado";
+  | "cancelado"
+  | "ajuste_anterior";
 
 export interface Order {
   id: string;

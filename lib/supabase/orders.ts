@@ -47,7 +47,12 @@ export async function getOrderByCodeAndToken(
           subtotal: Number(data.subtotal),
           shipping_cost: Number(data.shipping_cost),
           total: Number(data.total),
-          status: data.status,
+          status:
+            data.status === "ajuste_anterior" ||
+            (typeof data.internal_notes === "string" &&
+              data.internal_notes.includes("[Ajuste de pedido anterior]"))
+              ? "ajuste_anterior"
+              : data.status,
           internal_notes: data.internal_notes,
           created_at: data.created_at,
           order_items: (data.order_items || []).map((i: any) => ({

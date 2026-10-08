@@ -139,6 +139,7 @@ export function ProductSearchCombobox({
 }: ProductSearchComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [stockTab, setStockTab] = useState<"todos" | "con_stock" | "sin_stock">("todos");
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
@@ -164,8 +165,8 @@ export function ProductSearchCombobox({
     );
   }, [products]);
 
-  // Lista filtrada: si hay búsqueda, ordena por relevancia y luego alfabético; si no hay búsqueda, 100% alfabético A-Z
-  const filteredProducts = useMemo(() => {
+  // Lista de productos coincidentes con la búsqueda (ordenados por relevancia o alfabético A-Z)
+  const searchMatchedProducts = useMemo(() => {
     const norm = normalizeText(searchQuery);
     if (!norm) {
       return baseAlphabeticalProducts;
@@ -191,10 +192,39 @@ export function ProductSearchCombobox({
     return scored.map((item) => item.product);
   }, [baseAlphabeticalProducts, searchQuery]);
 
+  // Conteo de existencias para las pestañas de filtro rápido
+  const stockCounts = useMemo(() => {
+    let conStock = 0;
+    let sinStock = 0;
+    for (const p of searchMatchedProducts) {
+      if (p.stock > 0) {
+        conStock++;
+      } else {
+        sinStock++;
+      }
+    }
+    return {
+      total: searchMatchedProducts.length,
+      conStock,
+      sinStock,
+    };
+  }, [searchMatchedProducts]);
+
+  // Productos filtrados según la pestaña de stock activa
+  const filteredProducts = useMemo(() => {
+    if (stockTab === "con_stock") {
+      return searchMatchedProducts.filter((p) => p.stock > 0);
+    }
+    if (stockTab === "sin_stock") {
+      return searchMatchedProducts.filter((p) => p.stock <= 0);
+    }
+    return searchMatchedProducts;
+  }, [searchMatchedProducts, stockTab]);
+
   // Reset highlight cuando cambia la lista filtrada
   useEffect(() => {
     setHighlightedIndex(0);
-  }, [filteredProducts.length, searchQuery]);
+  }, [filteredProducts.length, searchQuery, stockTab]);
 
   // Manejo de teclado (flechas, Enter, Esc)
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -296,9 +326,9 @@ export function ProductSearchCombobox({
 
       {/* Popover / Menú Desplegable con Productos Ordenados Alfabéticamente y Filtrados */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl border border-[#E8DEF0] shadow-xl z-50 overflow-hidden animate-in fade-in-50 zoom-in-98 duration-150">
+        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl border border-[#E8DEF0] shadow-2xl z-50 overflow-hidden animate-in fade-in-50 zoom-in-98 duration-150">
           {/* Barra superior de estado */}
-          <div className="px-3.5 py-2 bg-[#FAF5FB] border-b border-[#F0E8F2] flex items-center justify-between text-[11px] text-[#7A7590]">
+          <div className="px-3.5 py-2 bg-[#FAF5FB] border-b border-[#F0E8F2] flex items-center justify-between text-[11px] text-[#7A7590] flex-wrap gap-2">
             <span className="font-semibold text-[#6D4BB8] flex items-center gap-1.5">
               <span>Catálogo Alfabético (A-Z)</span>
               <span className="px-1.5 py-0.2 bg-[#6D4BB8]/10 text-[#6D4BB8] rounded-full text-[10px] font-bold">
@@ -306,8 +336,48 @@ export function ProductSearchCombobox({
               </span>
             </span>
             <span className="hidden sm:inline text-[10px] text-[#9A93A8]">
-              {searchQuery ? "Coincidencias encontradas" : "Ordenado de la A a la Z"}
+              {searchQuery ? "Resultados por similitud y A-Z" : "Ordenado de la A a la Z"}
             </span>
+          </div>
+
+          {/* Pestañas de filtrado de stock rápido (Todos, Con stock, Sin stock) */}
+          <div className="px-3 py-1.5 bg-[#FAF5FB]/80 border-b border-[#F0E8F2] flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-bold text-[#7A7590] uppercase tracking-wider mr-1">
+              Filtro:
+            </span>
+            <button
+              type="button"
+              onClick={() => setStockTab("todos")}
+              className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                stockTab === "todos"
+                  ? "bg-[#6D4BB8] text-white shadow-2xs"
+                  : "bg-white text-[#7A7590] hover:text-[#2E2A3B] border border-[#F0E8F2]"
+              }`}
+            >
+              Todos ({stockCounts.total})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStockTab("con_stock")}
+              className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                stockTab === "con_stock"
+                  ? "bg-emerald-600 text-white shadow-2xs"
+                  : "bg-white text-[#7A7590] hover:text-[#2E2A3B] border border-[#F0E8F2]"
+              }`}
+            >
+              Con stock ({stockCounts.conStock})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStockTab("sin_stock")}
+              className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                stockTab === "sin_stock"
+                  ? "bg-amber-600 text-white shadow-2xs"
+                  : "bg-white text-[#7A7590] hover:text-[#2E2A3B] border border-[#F0E8F2]"
+              }`}
+            >
+              Sin stock / Histórico ({stockCounts.sinStock})
+            </button>
           </div>
 
           {/* Lista de productos */}
@@ -321,18 +391,33 @@ export function ProductSearchCombobox({
                   <AlertCircle className="w-5 h-5" />
                 </div>
                 <p className="text-xs font-bold text-[#2E2A3B]">
-                  No se encontraron productos para &ldquo;{searchQuery}&rdquo;
+                  {stockTab === "sin_stock"
+                    ? "No hay productos sin stock que coincidan con la búsqueda."
+                    : `No se encontraron productos para "${searchQuery}"`}
                 </p>
                 <p className="text-[11px] text-[#7A7590]">
-                  Verifica que esté bien escrito o prueba con palabras clave similares (ej: marca, categoría).
+                  Verifica que esté bien escrito o selecciona &quot;Todos&quot; para revisar el catálogo completo.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="mt-2 text-xs text-[#6D4BB8] font-bold underline cursor-pointer"
-                >
-                  Ver todos los productos (A-Z)
-                </button>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  {stockTab !== "todos" && (
+                    <button
+                      type="button"
+                      onClick={() => setStockTab("todos")}
+                      className="text-xs text-[#6D4BB8] font-bold underline cursor-pointer"
+                    >
+                      Ver todos
+                    </button>
+                  )}
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="text-xs text-[#6D4BB8] font-bold underline cursor-pointer"
+                    >
+                      Limpiar búsqueda
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               filteredProducts.map((p, index) => {
@@ -397,8 +482,9 @@ export function ProductSearchCombobox({
                               {p.stock} disp.
                             </span>
                           ) : (
-                            <span className="px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-600 font-bold text-[10px]">
-                              Sin stock
+                            <span className="px-2 py-0.2 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 font-bold text-[10px] flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                              Sin stock (Apto histórico)
                             </span>
                           )}
                         </div>
@@ -439,8 +525,8 @@ export function ProductSearchCombobox({
           </div>
 
           {/* Pie informativo */}
-          <div className="px-3.5 py-2 bg-gradient-to-r from-[#FAF5FB] to-white border-t border-[#F0E8F2] flex items-center justify-between text-[11px] text-[#7A7590]">
-            <span>💡 Haz clic en <b>Agregar</b> para sumar artículos al pedido</span>
+          <div className="px-3.5 py-2 bg-gradient-to-r from-[#FAF5FB] to-white border-t border-[#F0E8F2] flex items-center justify-between text-[11px] text-[#7A7590] flex-wrap gap-1">
+            <span>💡 Haz clic en <b>Agregar</b> para sumar productos al pedido (incluso sin stock para pedidos históricos)</span>
             <button
               type="button"
               onClick={() => setIsOpen(false)}

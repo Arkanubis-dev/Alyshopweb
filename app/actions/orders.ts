@@ -41,7 +41,12 @@ export async function getAllAdminOrdersAction(): Promise<Order[]> {
             subtotal: Number(d.subtotal),
             shipping_cost: Number(d.shipping_cost),
             total: Number(d.total),
-            status: d.status,
+            status:
+              d.status === "ajuste_anterior" ||
+              (typeof d.internal_notes === "string" &&
+                d.internal_notes.includes("[Ajuste de pedido anterior]"))
+                ? "ajuste_anterior"
+                : d.status,
             internal_notes: d.internal_notes,
             created_at: d.created_at,
             order_items: (d.order_items || []).map((i: any) => ({
@@ -157,10 +162,28 @@ export async function updateOrderStatusAction(
     // Actualizar estado en Supabase
     const supabase = createAdminClient();
     if (supabase) {
-      await supabase
+      const { error: updateErr } = await supabase
         .from("orders")
         .update({ status: newStatus })
         .eq("id", order.id);
+
+      if (
+        updateErr &&
+        (updateErr.message?.includes("orders_status_check") ||
+          updateErr.message?.includes("status"))
+      ) {
+        // Fallback si la migración aún no se ejecuta en Supabase
+        const safeStatus = newStatus === "ajuste_anterior" ? "entregado" : newStatus;
+        const notePrefix =
+          newStatus === "ajuste_anterior" ? "[Ajuste de pedido anterior] " : "";
+        await supabase
+          .from("orders")
+          .update({
+            status: safeStatus,
+            internal_notes: `${notePrefix}${order.internal_notes || ""}`.trim(),
+          })
+          .eq("id", order.id);
+      }
     }
 
     // Actualizar estado local
@@ -297,7 +320,21 @@ export async function updateFullOrderAction(
         .update(updatePayload)
         .eq("id", order.id);
 
-      if (orderError) throw orderError;
+      if (
+        orderError &&
+        (orderError.message?.includes("orders_status_check") ||
+          orderError.message?.includes("status"))
+      ) {
+        updatePayload.status = "entregado";
+        updatePayload.internal_notes = `[Ajuste de pedido anterior] ${updatePayload.internal_notes || ""}`.trim();
+        const { error: retryError } = await supabase
+          .from("orders")
+          .update(updatePayload)
+          .eq("id", order.id);
+        if (retryError) throw retryError;
+      } else if (orderError) {
+        throw orderError;
+      }
     }
 
     // 3. Update local cache
@@ -462,6 +499,11 @@ export async function createManualOrderAction(
 
     // 3. Insert into Supabase
     if (supabase) {
+      const isHistoricalAdjust = input.status === "ajuste_anterior";
+      const defaultNotes = isHistoricalAdjust
+        ? "Ajuste de pedido anterior (Histórico ya facturado)"
+        : "Pedido manual creado desde panel administrativo";
+
       const orderPayload = {
         code: nextCode,
         public_token: publicToken,
@@ -474,7 +516,7 @@ export async function createManualOrderAction(
         address: input.address.trim() || "Entrega acordada",
         delivery_method: input.delivery_method || "envio",
         notes: input.notes?.trim() || null,
-        internal_notes: input.internal_notes?.trim() || "Pedido manual creado desde panel administrativo",
+        internal_notes: input.internal_notes?.trim() || defaultNotes,
         status: input.status || "pendiente",
         subtotal,
         shipping_cost: shippingCost,
@@ -491,11 +533,28 @@ export async function createManualOrderAction(
       if (!orderError && resOrder) {
         insertedOrder = resOrder;
       } else {
-        // Si las columnas customer_email o customer_id_number aún no existen en Supabase:
-        const { customer_email, customer_id_number, ...safePayload } = orderPayload;
+        // Fallback seguro por si la restricción CHECK de status o las columnas nuevas no están en Supabase
+        const isStatusConstraint =
+          orderError?.message?.includes("orders_status_check") ||
+          orderError?.message?.includes("status");
+
+        const fallbackStatus =
+          isStatusConstraint && isHistoricalAdjust ? "entregado" : (input.status || "pendiente");
+        const fallbackNote =
+          isStatusConstraint && isHistoricalAdjust
+            ? `[Ajuste de pedido anterior] ${orderPayload.internal_notes}`.trim()
+            : orderPayload.internal_notes;
+
+        const safePayload: Record<string, any> = {
+          ...orderPayload,
+          status: fallbackStatus,
+          internal_notes: fallbackNote,
+        };
+
+        const { customer_email, customer_id_number, ...safeColumns } = safePayload;
         const { data: safeOrder, error: safeError } = await supabase
           .from("orders")
-          .insert(safePayload)
+          .insert(safeColumns)
           .select()
           .single();
 
