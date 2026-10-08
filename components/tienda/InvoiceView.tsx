@@ -172,16 +172,16 @@ export function InvoiceView({ order, whatsappUrl }: InvoiceViewProps) {
               <span>Datos del Cliente</span>
             </span>
             <p className="text-sm font-bold text-[#2E2A3B]">{order.customer_name}</p>
+            <p className="text-[#7A7590] flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-[#25D366]" />
+              <span>{order.customer_phone}</span>
+            </p>
             {order.customer_id_number && (
               <p className="text-[#7A7590] flex items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-[#6D4BB8]" />
                 <span>C.C. {order.customer_id_number}</span>
               </p>
             )}
-            <p className="text-[#7A7590] flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-[#F472A8]" />
-              <span>{order.customer_phone}</span>
-            </p>
             {order.customer_email && (
               <p className="text-[#7A7590] flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-[#6D4BB8]" />

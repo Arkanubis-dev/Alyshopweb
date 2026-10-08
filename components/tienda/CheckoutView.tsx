@@ -166,13 +166,13 @@ export function CheckoutView() {
               <div className="flex items-center justify-between pb-1 border-b border-[#F0E8F2]">
                 <h2 className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8] flex items-center gap-2">
                   <User className="w-4 h-4" />
-                  <span>1. Datos del Cliente (Cédula, Correo y Celular)</span>
+                  <span>1. Datos del Cliente</span>
                 </h2>
-                <span className="text-[11px] text-[#F472A8] font-bold">* Obligatorios</span>
+                <span className="text-[11px] text-[#F472A8] font-bold">* Todos los campos son obligatorios</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Nombre */}
+                {/* 1. Nombre y apellido */}
                 <div className="space-y-1">
                   <label htmlFor="customer_name" className="text-xs font-semibold text-[#2E2A3B] flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-[#6D4BB8]" />
@@ -192,30 +192,7 @@ export function CheckoutView() {
                   )}
                 </div>
 
-                {/* Cédula / Documento */}
-                <div className="space-y-1">
-                  <label htmlFor="customer_id_number" className="text-xs font-semibold text-[#2E2A3B] flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <CreditCard className="w-3.5 h-3.5 text-[#6D4BB8]" />
-                      <span>Cédula / Documento de identidad *</span>
-                    </span>
-                    <span className="text-[10px] text-[#7A7590] font-normal">Identificación</span>
-                  </label>
-                  <input
-                    id="customer_id_number"
-                    type="text"
-                    {...register("customer_id_number")}
-                    placeholder="Ej: 1020789456"
-                    className="w-full text-xs sm:text-sm p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] focus:outline-none focus:border-[#F472A8] focus:ring-2 focus:ring-[#FCE4EF]"
-                  />
-                  {errors.customer_id_number && (
-                    <p className="text-[11px] text-red-500 font-medium">
-                      {errors.customer_id_number.message}
-                    </p>
-                  )}
-                </div>
-
-                {/* Celular */}
+                {/* 2. Celular */}
                 <div className="space-y-1">
                   <label htmlFor="customer_phone" className="text-xs font-semibold text-[#2E2A3B] flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5 text-[#25D366]" />
@@ -241,7 +218,30 @@ export function CheckoutView() {
                   )}
                 </div>
 
-                {/* Correo Electrónico */}
+                {/* 3. Cédula (Abajo de Nombre y Celular) */}
+                <div className="space-y-1">
+                  <label htmlFor="customer_id_number" className="text-xs font-semibold text-[#2E2A3B] flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-[#6D4BB8]" />
+                      <span>Cédula / Documento de identidad *</span>
+                    </span>
+                    <span className="text-[10px] text-[#7A7590] font-normal">Identificación</span>
+                  </label>
+                  <input
+                    id="customer_id_number"
+                    type="text"
+                    {...register("customer_id_number")}
+                    placeholder="Ej: 1020789456"
+                    className="w-full text-xs sm:text-sm p-3 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] focus:outline-none focus:border-[#F472A8] focus:ring-2 focus:ring-[#FCE4EF]"
+                  />
+                  {errors.customer_id_number && (
+                    <p className="text-[11px] text-red-500 font-medium">
+                      {errors.customer_id_number.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* 4. Correo Electrónico (Abajo de Nombre y Celular) */}
                 <div className="space-y-1">
                   <label htmlFor="customer_email" className="text-xs font-semibold text-[#2E2A3B] flex items-center justify-between">
                     <span className="flex items-center gap-1.5">

@@ -298,8 +298,8 @@ function buildWhatsAppMessage({
 *Fecha:* ${dateFormatted}
 -----------------------------
 *Cliente:* ${customerName}
-*Cédula / Documento:* ${customerIdNumber}
 *Celular:* ${customerPhone}
+*Cédula / Documento:* ${customerIdNumber}
 *Correo electrónico:* ${customerEmail}
 *Ciudad:* ${city}
 *Dirección:* ${address}, Barrio ${neighborhood}

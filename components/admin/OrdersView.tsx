@@ -1060,19 +1060,6 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
 
                   <div>
                     <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
-                      Cédula / Documento de Identidad
-                    </label>
-                    <input
-                      type="text"
-                      value={editCustomerIdNumber}
-                      onChange={(e) => setEditCustomerIdNumber(e.target.value)}
-                      placeholder="Ej: 1020789456"
-                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
                       Teléfono / WhatsApp *
                     </label>
                     <input
@@ -1080,6 +1067,19 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                       value={editCustomerPhone}
                       onChange={(e) => setEditCustomerPhone(e.target.value)}
                       placeholder="Ej: 300 123 4567"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Cédula / Documento de Identidad
+                    </label>
+                    <input
+                      type="text"
+                      value={editCustomerIdNumber}
+                      onChange={(e) => setEditCustomerIdNumber(e.target.value)}
+                      placeholder="Ej: 1020789456"
                       className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-semibold text-[#2E2A3B] focus:outline-none focus:border-[#F472A8]"
                     />
                   </div>
@@ -1510,19 +1510,6 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
 
                   <div>
                     <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
-                      Cédula / Documento de Identidad
-                    </label>
-                    <input
-                      type="text"
-                      value={createCustomerIdNumber}
-                      onChange={(e) => setCreateCustomerIdNumber(e.target.value)}
-                      placeholder="Ej: 1020789456 (Identifica clientes nuevos)"
-                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
                       Celular / WhatsApp *
                     </label>
                     <input
@@ -1531,6 +1518,19 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                       value={createCustomerPhone}
                       onChange={(e) => setCreateCustomerPhone(e.target.value)}
                       placeholder="Ej: 3001234567"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Cédula / Documento de Identidad
+                    </label>
+                    <input
+                      type="text"
+                      value={createCustomerIdNumber}
+                      onChange={(e) => setCreateCustomerIdNumber(e.target.value)}
+                      placeholder="Ej: 1020789456 (Identifica clientes nuevos)"
                       className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs font-semibold focus:outline-none focus:border-[#F472A8]"
                     />
                   </div>
