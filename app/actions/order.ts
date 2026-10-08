@@ -76,7 +76,11 @@ export async function createOrderAction(
         quantity: item.quantity,
       }));
 
-      const { data: rpcResult, error: rpcError } = await supabase.rpc("create_order", {
+      let rpcResult: any = null;
+      let rpcError: any = null;
+
+      // 1.1 Intentar RPC con la firma completa (incluyendo email y cédula)
+      const resFull = await supabase.rpc("create_order", {
         p_customer_name: data.customer_name,
         p_customer_phone: data.customer_phone,
         p_customer_email: data.customer_email,
@@ -90,11 +94,75 @@ export async function createOrderAction(
         p_items: rpcItems,
       });
 
+      if (!resFull.error && resFull.data) {
+        rpcResult = resFull.data;
+      } else {
+        // Si el error es de stock, informar de inmediato
+        if (
+          resFull.error?.message?.includes("Stock insuficiente") ||
+          resFull.error?.message?.includes("no existe")
+        ) {
+          return { success: false, error: resFull.error.message };
+        }
+
+        // 1.2 Si falló por discrepancia de firma (por ejemplo antes de aplicar la migración SQL),
+        // reintentar con la firma original para que el pedido sí quede guardado en Supabase
+        const resLegacy = await supabase.rpc("create_order", {
+          p_customer_name: data.customer_name,
+          p_customer_phone: data.customer_phone,
+          p_city: data.city,
+          p_neighborhood: data.neighborhood,
+          p_address: fullAddress,
+          p_delivery_method: data.delivery_method,
+          p_notes: data.notes || null,
+          p_shipping_cost: 0,
+          p_items: rpcItems,
+        });
+
+        if (!resLegacy.error && resLegacy.data) {
+          rpcResult = resLegacy.data;
+          // Actualizar email y cédula si las columnas existen en la base de datos
+          try {
+            await supabase
+              .from("orders")
+              .update({
+                customer_email: data.customer_email,
+                customer_id_number: data.customer_id_number,
+              })
+              .eq("code", resLegacy.data.code);
+          } catch {}
+        } else {
+          rpcError = resLegacy.error || resFull.error;
+        }
+      }
+
       if (!rpcError && rpcResult) {
         const orderCode = rpcResult.code;
         const publicToken = rpcResult.public_token;
         const subtotal = Number(rpcResult.subtotal);
         const total = Number(rpcResult.total);
+
+        // Guardar copia local persistente de respaldo
+        saveFallbackOrder({
+          id: rpcResult.order_id || `ord-${Date.now()}`,
+          code: orderCode,
+          public_token: publicToken,
+          customer_name: data.customer_name,
+          customer_phone: data.customer_phone,
+          customer_email: data.customer_email,
+          customer_id_number: data.customer_id_number,
+          city: data.city,
+          neighborhood: data.neighborhood,
+          address: fullAddress,
+          notes: data.notes || undefined,
+          delivery_method: data.delivery_method,
+          subtotal,
+          shipping_cost: 0,
+          total,
+          status: "pendiente",
+          created_at: new Date().toISOString(),
+          order_items: [],
+        });
 
         // Registrar cliente (nuevo o actualización) para futuras campañas publicitarias
         await recordOrderCustomerAction({
@@ -137,8 +205,10 @@ export async function createOrderAction(
         };
       } else if (rpcError) {
         console.warn("Supabase RPC failed or returned error, evaluating fallback:", rpcError);
-        // Si el error es de stock insuficiente, retornarlo directamente al usuario
-        if (rpcError.message.includes("Stock insuficiente") || rpcError.message.includes("no existe")) {
+        if (
+          rpcError.message.includes("Stock insuficiente") ||
+          rpcError.message.includes("no existe")
+        ) {
           return { success: false, error: rpcError.message };
         }
       }

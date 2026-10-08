@@ -154,6 +154,7 @@ export interface CreateCustomerInput {
 }
 
 export interface UpdateCustomerInput {
+  id_number?: string;
   name?: string;
   email?: string;
   phone?: string;

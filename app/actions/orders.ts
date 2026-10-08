@@ -461,13 +461,27 @@ export async function createManualOrderAction(
         total,
       };
 
-      const { data: insertedOrder, error: orderError } = await supabase
+      let insertedOrder: any = null;
+      const { data: resOrder, error: orderError } = await supabase
         .from("orders")
         .insert(orderPayload)
         .select()
         .single();
 
-      if (orderError) throw orderError;
+      if (!orderError && resOrder) {
+        insertedOrder = resOrder;
+      } else {
+        // Si las columnas customer_email o customer_id_number aún no existen en Supabase:
+        const { customer_email, customer_id_number, ...safePayload } = orderPayload;
+        const { data: safeOrder, error: safeError } = await supabase
+          .from("orders")
+          .insert(safePayload)
+          .select()
+          .single();
+
+        if (safeError) throw safeError;
+        insertedOrder = safeOrder;
+      }
       finalId = insertedOrder.id;
 
       // Insert order items
@@ -530,19 +544,17 @@ export async function createManualOrderAction(
 
     saveFallbackOrder(createdOrder);
 
-    // Si se especificó cédula, registrar al cliente en la base de datos publicitaria
-    if (input.customer_id_number?.trim()) {
-      await recordOrderCustomerAction({
-        id_number: input.customer_id_number.trim(),
-        name: input.customer_name.trim(),
-        email: input.customer_email?.trim() || "",
-        phone: input.customer_phone.trim(),
-        city: input.city.trim() || "Bogotá",
-        neighborhood: input.neighborhood?.trim(),
-        address: input.address?.trim(),
-        total,
-      });
-    }
+    // Registrar SIEMPRE al cliente en la base de datos publicitaria (Automático)
+    await recordOrderCustomerAction({
+      id_number: input.customer_id_number?.trim() || `CC-${input.customer_phone.trim()}`,
+      name: input.customer_name.trim(),
+      email: input.customer_email?.trim() || "",
+      phone: input.customer_phone.trim(),
+      city: input.city.trim() || "Bogotá",
+      neighborhood: input.neighborhood?.trim(),
+      address: input.address?.trim(),
+      total,
+    });
 
     revalidatePath("/admin/pedidos");
     revalidatePath("/admin");
