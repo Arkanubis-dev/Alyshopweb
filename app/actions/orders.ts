@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Order, OrderStatus, UpdateOrderInput } from "@/types";
-import { fallbackOrders, removeFallbackOrder, saveFallbackOrder } from "@/lib/orders-cache";
+import { fallbackOrders, getAllFallbackOrders, removeFallbackOrder, saveFallbackOrder } from "@/lib/orders-cache";
 import { updateProductStockAction } from "./inventory";
 import { getAllAdminProducts } from "./products";
 import { recordOrderCustomerAction } from "./customers";
@@ -12,6 +12,8 @@ import { recordOrderCustomerAction } from "./customers";
 export async function getAllAdminOrdersAction(): Promise<Order[]> {
   try {
     const supabase = createAdminClient();
+    const ordersMap = new Map<string, Order>();
+
     if (supabase) {
       const { data, error } = await supabase
         .from("orders")
@@ -22,45 +24,63 @@ export async function getAllAdminOrdersAction(): Promise<Order[]> {
         .order("created_at", { ascending: false });
 
       if (!error && data) {
-        return data.map((d: any) => ({
-          id: d.id,
-          code: d.code,
-          public_token: d.public_token,
-          customer_name: d.customer_name,
-          customer_phone: d.customer_phone,
-          customer_email: d.customer_email,
-          customer_id_number: d.customer_id_number,
-          city: d.city,
-          neighborhood: d.neighborhood,
-          address: d.address,
-          notes: d.notes,
-          delivery_method: d.delivery_method,
-          subtotal: Number(d.subtotal),
-          shipping_cost: Number(d.shipping_cost),
-          total: Number(d.total),
-          status: d.status,
-          internal_notes: d.internal_notes,
-          created_at: d.created_at,
-          order_items: (d.order_items || []).map((i: any) => ({
-            id: i.id,
-            order_id: i.order_id,
-            product_id: i.product_id,
-            product_name: i.product_name,
-            unit_price: Number(i.unit_price),
-            quantity: i.quantity,
-            subtotal: Number(i.subtotal),
-            image_url: i.image_url,
-          })),
-        }));
+        for (const d of data) {
+          const ord: Order = {
+            id: d.id,
+            code: d.code,
+            public_token: d.public_token,
+            customer_name: d.customer_name,
+            customer_phone: d.customer_phone,
+            customer_email: d.customer_email,
+            customer_id_number: d.customer_id_number,
+            city: d.city,
+            neighborhood: d.neighborhood,
+            address: d.address,
+            notes: d.notes,
+            delivery_method: d.delivery_method,
+            subtotal: Number(d.subtotal),
+            shipping_cost: Number(d.shipping_cost),
+            total: Number(d.total),
+            status: d.status,
+            internal_notes: d.internal_notes,
+            created_at: d.created_at,
+            order_items: (d.order_items || []).map((i: any) => ({
+              id: i.id,
+              order_id: i.order_id,
+              product_id: i.product_id,
+              product_name: i.product_name,
+              unit_price: Number(i.unit_price),
+              quantity: i.quantity,
+              subtotal: Number(i.subtotal),
+              image_url: i.image_url,
+            })),
+          };
+          ordersMap.set(ord.code, ord);
+          ordersMap.set(ord.id, ord);
+        }
       }
     }
 
-    return Array.from(fallbackOrders.values()).sort(
+    // Combinar con almacenamiento persistente local
+    const localOrders = getAllFallbackOrders();
+    for (const lo of localOrders) {
+      if (!ordersMap.has(lo.code) && !ordersMap.has(lo.id)) {
+        ordersMap.set(lo.code, lo);
+        ordersMap.set(lo.id, lo);
+      }
+    }
+
+    const uniqueOrders = new Map<string, Order>();
+    for (const o of ordersMap.values()) {
+      uniqueOrders.set(o.id, o);
+    }
+
+    return Array.from(uniqueOrders.values()).sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   } catch (err) {
     console.error("Error in getAllAdminOrdersAction:", err);
-    return Array.from(fallbackOrders.values());
+    return getAllFallbackOrders();
   }
 }
 

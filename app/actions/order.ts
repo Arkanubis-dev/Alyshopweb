@@ -2,6 +2,8 @@
 
 import { checkoutSchema, CheckoutSchemaType } from "@/lib/validations/checkout";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
 import { getStoreSettings } from "@/lib/supabase/queries";
 import { MOCK_PRODUCTS } from "@/lib/mock-data";
 import { formatCOP } from "@/lib/utils";
@@ -65,10 +67,10 @@ export async function createOrderAction(
   });
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient() || (await createClient());
 
     // =========================================================================
-    // INTENTO 1: SUPABASE RPC (Modo producción conectado)
+    // INTENTO 1: SUPABASE (RPC o Inserción Directa)
     // =========================================================================
     if (supabase) {
       const rpcItems = cartItems.map((item) => ({
@@ -121,7 +123,6 @@ export async function createOrderAction(
 
         if (!resLegacy.error && resLegacy.data) {
           rpcResult = resLegacy.data;
-          // Actualizar email y cédula si las columnas existen en la base de datos
           try {
             await supabase
               .from("orders")
@@ -132,7 +133,91 @@ export async function createOrderAction(
               .eq("code", resLegacy.data.code);
           } catch {}
         } else {
-          rpcError = resLegacy.error || resFull.error;
+          // 1.3 Inserción directa en tabla orders si ambos RPCs fallan
+          try {
+            let nextCode = "ALY-0001";
+            const { data: latestOrder } = await supabase
+              .from("orders")
+              .select("code")
+              .order("created_at", { ascending: false })
+              .limit(1);
+            if (latestOrder && latestOrder.length > 0 && latestOrder[0]?.code) {
+              const match = latestOrder[0].code.match(/ALY-(\d+)/);
+              if (match) {
+                nextCode = `ALY-${String(parseInt(match[1], 10) + 1).padStart(4, "0")}`;
+              }
+            }
+
+            const token = crypto.randomBytes(16).toString("hex");
+            const calcSubtotal = cartItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+
+            const directPayload: any = {
+              code: nextCode,
+              public_token: token,
+              customer_name: data.customer_name,
+              customer_phone: data.customer_phone,
+              city: data.city,
+              neighborhood: data.neighborhood,
+              address: fullAddress,
+              delivery_method: data.delivery_method,
+              notes: data.notes || null,
+              subtotal: calcSubtotal,
+              shipping_cost: 0,
+              total: calcSubtotal,
+              status: "pendiente",
+            };
+
+            // Intentar con customer_email y customer_id_number
+            let directOrder: any = null;
+            const { data: dOrder, error: dErr } = await supabase
+              .from("orders")
+              .insert({
+                ...directPayload,
+                customer_email: data.customer_email,
+                customer_id_number: data.customer_id_number,
+              })
+              .select()
+              .single();
+
+            if (!dErr && dOrder) {
+              directOrder = dOrder;
+            } else {
+              // Si falla por columnas, insertar sin ellas
+              const { data: dOrderSafe } = await supabase
+                .from("orders")
+                .insert(directPayload)
+                .select()
+                .single();
+              directOrder = dOrderSafe;
+            }
+
+            if (directOrder) {
+              await supabase.from("order_items").insert(
+                cartItems.map((ci) => ({
+                  order_id: directOrder.id,
+                  product_id: ci.product_id,
+                  product_name: ci.name,
+                  unit_price: ci.price,
+                  quantity: ci.quantity,
+                  subtotal: ci.price * ci.quantity,
+                  image_url: ci.image_url,
+                }))
+              );
+
+              rpcResult = {
+                order_id: directOrder.id,
+                code: directOrder.code,
+                public_token: directOrder.public_token,
+                subtotal: directOrder.subtotal,
+                total: directOrder.total,
+              };
+              rpcError = null;
+            } else {
+              rpcError = resLegacy.error || resFull.error;
+            }
+          } catch {
+            rpcError = resLegacy.error || resFull.error;
+          }
         }
       }
 
@@ -196,6 +281,14 @@ export async function createOrderAction(
         });
 
         const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+
+        try {
+          revalidatePath("/admin/pedidos");
+          revalidatePath("/admin/clientes");
+          revalidatePath("/admin");
+          revalidatePath(`/pedido/${orderCode}`);
+          revalidatePath("/");
+        } catch {}
 
         return {
           success: true,
@@ -302,6 +395,14 @@ export async function createOrderAction(
     });
 
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+
+    try {
+      revalidatePath("/admin/pedidos");
+      revalidatePath("/admin/clientes");
+      revalidatePath("/admin");
+      revalidatePath(`/pedido/${orderCode}`);
+      revalidatePath("/");
+    } catch {}
 
     return {
       success: true,
