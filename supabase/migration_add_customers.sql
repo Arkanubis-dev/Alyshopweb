@@ -1,7 +1,7 @@
 -- =========================================================================
 -- MIGRACIÓN DE TABLA DE CLIENTES Y COLUMNAS DE PEDIDOS PARA ALYSHOP
--- Ejecuta este script en el SQL Editor de tu proyecto Supabase
--- (https://supabase.com/dashboard/project/iapvjjgirgculjdbycvc/sql)
+-- Este script NO borra ni modifica tus productos, imágenes ni categorías.
+-- Solo añade la tabla nueva de clientes y las columnas de cédula y correo.
 -- =========================================================================
 
 -- 1. AGREGAR COLUMNAS DE CÉDULA Y CORREO A LA TABLA ORDERS (Si no existen)
@@ -43,12 +43,16 @@ CREATE POLICY "Permitir insercion anonima en customers para checkout"
   TO anon
   WITH CHECK (true);
 
--- Otorgar permisos
+-- Otorgar permisos sobre la tabla customers
 GRANT ALL ON TABLE public.customers TO authenticated;
 GRANT ALL ON TABLE public.customers TO service_role;
 GRANT SELECT, INSERT ON TABLE public.customers TO anon;
 
--- 3. ACTUALIZAR O CREAR FUNCIÓN RPC create_order CON ALIMENTACIÓN AUTOMÁTICA DE CLIENTES
+-- 3. ELIMINAR VERSIONES ANTERIORES DE LA FUNCIÓN PARA EVITAR CONFLICTOS DE SOBRECARGA
+DROP FUNCTION IF EXISTS public.create_order(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, JSONB);
+DROP FUNCTION IF EXISTS public.create_order(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, JSONB);
+
+-- 4. CREAR LA FUNCIÓN RPC create_order CON ALIMENTACIÓN AUTOMÁTICA DE CLIENTES
 CREATE OR REPLACE FUNCTION public.create_order(
   p_customer_name TEXT,
   p_customer_phone TEXT,
@@ -199,4 +203,5 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.create_order TO anon, authenticated, service_role;
+-- 5. OTORGAR PERMISOS ESPECIFICANDO LA FIRMA EXACTA
+GRANT EXECUTE ON FUNCTION public.create_order(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, JSONB) TO anon, authenticated, service_role;
