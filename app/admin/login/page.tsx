@@ -120,24 +120,6 @@ function LoginForm() {
             )}
           </button>
         </form>
-
-        {/* Quick login demo helper */}
-        <div className="p-3 bg-[#FAF5FB] rounded-2xl border border-[#F0E8F2] text-[11px] text-[#7A7590] space-y-1">
-          <p className="font-semibold text-[#6D4BB8]">Acceso rápido demo:</p>
-          <p>
-            Email: <code>admin@alyshop.co</code> • Contraseña: <code>admin123</code>
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail("admin@alyshop.co");
-              setPassword("admin123");
-            }}
-            className="text-[#F472A8] font-bold hover:underline cursor-pointer"
-          >
-            Autocompletar datos demo
-          </button>
-        </div>
       </div>
 
       {/* Back to store */}
