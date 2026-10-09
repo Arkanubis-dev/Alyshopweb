@@ -56,6 +56,8 @@ export interface OrderItem {
   quantity: number;
   subtotal: number;
   image_url?: string;
+  transferred_to_code?: string; // Código del pedido al que fue transferido (ej: ALY-0005)
+  transferred_from_code?: string; // Código del pedido de origen (ej: ALY-0004)
 }
 
 export type OrderStatus =
@@ -86,6 +88,7 @@ export interface Order {
   internal_notes?: string;
   created_at: string;
   order_items?: OrderItem[];
+  parent_order_code?: string; // Código del pedido original si proviene de un despacho parcial
 }
 
 export interface UpdateOrderInput {
@@ -101,6 +104,7 @@ export interface UpdateOrderInput {
   shipping_cost?: number;
   status?: OrderStatus;
   internal_notes?: string;
+  parent_order_code?: string;
   order_items?: {
     id?: string;
     product_id?: string;
@@ -109,6 +113,8 @@ export interface UpdateOrderInput {
     quantity: number;
     subtotal?: number;
     image_url?: string;
+    transferred_to_code?: string;
+    transferred_from_code?: string;
   }[];
 }
 

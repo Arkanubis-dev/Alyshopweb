@@ -125,6 +125,16 @@ export function InvoiceView({ order, whatsappUrl }: InvoiceViewProps) {
           💡 <strong>Nota:</strong> Si WhatsApp no se abrió automáticamente, pulsa el botón verde
           &quot;Abrir WhatsApp&quot; para enviar tu pedido a nuestro equipo.
         </div>
+
+        {order.parent_order_code && (
+          <div className="p-3.5 bg-[#FCE4EF]/80 rounded-2xl border border-[#F6B8D6] text-xs text-[#2E2A3B] flex items-center gap-2.5">
+            <span className="font-bold text-[#C02670] shrink-0">📦 Despacho Complementario:</span>
+            <span>
+              Este pedido contiene los artículos pendientes transferidos de tu orden{" "}
+              <strong>{order.parent_order_code}</strong>.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ================================================================= */}
@@ -234,37 +244,86 @@ export function InvoiceView({ order, whatsappUrl }: InvoiceViewProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#FAF5FC]">
-                {(order.order_items || []).map((item) => (
-                  <tr key={item.id} className="hover:bg-[#FFFBF7]/50">
-                    <td className="py-3 pr-2">
-                      <div className="flex items-center gap-3">
-                        {item.image_url && (
-                          <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-[#FAF5FB] border border-[#F0E8F2] shrink-0 print:hidden">
-                            <Image
-                              src={item.image_url}
-                              alt={item.product_name}
-                              fill
-                              className="object-cover"
-                            />
+                {(order.order_items || []).map((item) => {
+                  const isTransferred = Boolean(item.transferred_to_code);
+                  return (
+                    <tr
+                      key={item.id}
+                      className={
+                        isTransferred
+                          ? "bg-gray-50/80 text-gray-400 border-l-2 border-l-[#6D4BB8]"
+                          : "hover:bg-[#FFFBF7]/50"
+                      }
+                    >
+                      <td className="py-3 pr-2">
+                        <div className="flex items-center gap-3">
+                          {item.image_url && (
+                            <div
+                              className={`relative w-11 h-11 rounded-lg overflow-hidden bg-[#FAF5FB] border border-[#F0E8F2] shrink-0 print:hidden ${
+                                isTransferred ? "opacity-40 grayscale" : ""
+                              }`}
+                            >
+                              <Image
+                                src={item.image_url}
+                                alt={item.product_name}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <p
+                              className={`font-semibold ${
+                                isTransferred ? "text-gray-500 line-through" : "text-[#2E2A3B]"
+                              }`}
+                            >
+                              {item.product_name}
+                            </p>
+                            {isTransferred ? (
+                              <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-md bg-[#EEEAFB] text-[#6D4BB8] text-[10px] font-bold">
+                                ↗️ Transferido a próximo despacho ({item.transferred_to_code})
+                              </span>
+                            ) : item.transferred_from_code ? (
+                              <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-md bg-[#FCE4EF] text-[#C02670] text-[10px] font-bold">
+                                ↙️ Entrega complementaria de {item.transferred_from_code}
+                              </span>
+                            ) : (
+                              <p className="text-[11px] text-[#7A7590]">Ref: ALY-PROD</p>
+                            )}
                           </div>
-                        )}
-                        <div>
-                          <p className="font-semibold text-[#2E2A3B]">{item.product_name}</p>
-                          <p className="text-[11px] text-[#7A7590]">Ref: ALY-PROD</p>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2 text-center font-bold text-[#2E2A3B]">
-                      {item.quantity}
-                    </td>
-                    <td className="py-3 px-2 text-right text-[#7A7590]">
-                      {formatCOP(item.unit_price)}
-                    </td>
-                    <td className="py-3 pl-2 text-right font-bold text-[#2E2A3B]">
-                      {formatCOP(item.subtotal)}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td
+                        className={`py-3 px-2 text-center font-bold ${
+                          isTransferred ? "text-gray-400 line-through" : "text-[#2E2A3B]"
+                        }`}
+                      >
+                        {item.quantity}
+                      </td>
+                      <td
+                        className={`py-3 px-2 text-right ${
+                          isTransferred ? "text-gray-400 line-through" : "text-[#7A7590]"
+                        }`}
+                      >
+                        {formatCOP(item.unit_price)}
+                      </td>
+                      <td className="py-3 pl-2 text-right">
+                        <span
+                          className={`font-bold ${
+                            isTransferred ? "text-gray-400 line-through" : "text-[#2E2A3B]"
+                          }`}
+                        >
+                          {formatCOP(item.subtotal)}
+                        </span>
+                        {isTransferred && (
+                          <span className="block text-[10px] text-gray-500 font-normal">
+                            (No suma a esta entrega)
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

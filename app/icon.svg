@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="alyBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#845EC2" />
+      <stop offset="50%" stop-color="#6D4BB8" />
+      <stop offset="100%" stop-color="#512E9E" />
+    </linearGradient>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF75AC" />
+      <stop offset="100%" stop-color="#F43F5E" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#301560" flood-opacity="0.4" />
+    </filter>
+    <filter id="heartShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Base with Alyshop Signature Violet -->
+  <rect width="64" height="64" rx="16" fill="url(#alyBg)" />
+
+  <!-- Subtle inner border highlight -->
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="none" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="1.5" />
+
+  <!-- Shopping Bag Handles -->
+  <path d="M24 23 V17.5 C24 13.2 27.5 9.5 32 9.5 C36.5 9.5 40 13.2 40 17.5 V23" 
+        fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" />
+
+  <!-- Shopping Bag Body -->
+  <path d="M17 23 C17 21.5 18.2 20.5 19.7 20.5 L44.3 20.5 C45.8 20.5 47 21.5 47 23 L49 48 C49 50.5 47 52.5 44.5 52.5 L19.5 52.5 C17 52.5 15 50.5 15 48 Z" 
+        fill="#FFFFFF" filter="url(#glow)" />
+
+  <!-- Bag Fold Accent line -->
+  <path d="M16 23 L48 23" stroke="#F0E8F2" stroke-width="1.5" />
+
+  <!-- Cute Heart Accent (Bottom Right of Bag) -->
+  <path d="M42.5 35 C39.5 31.8 35 34.2 35 37.8 C35 42 42.5 47.5 42.5 47.5 C42.5 47.5 50 42 50 37.8 C50 34.2 45.5 31.8 42.5 35 Z" 
+        fill="url(#heartGrad)" filter="url(#heartShadow)" />
+</svg>

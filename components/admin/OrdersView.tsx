@@ -30,6 +30,10 @@ import {
   Mail,
   CreditCard,
   Archive,
+  Split,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Undo2,
 } from "lucide-react";
 import { Order, OrderStatus, Product } from "@/types";
 import { formatCOP } from "@/lib/utils";
@@ -39,6 +43,8 @@ import {
   updateFullOrderAction,
   deleteOrderAction,
   createManualOrderAction,
+  splitOrderAction,
+  revertItemTransferAction,
 } from "@/app/actions/orders";
 import { ProductSearchCombobox } from "./ProductSearchCombobox";
 
@@ -55,6 +61,8 @@ interface EditableItem {
   quantity: number;
   subtotal?: number;
   image_url?: string;
+  transferred_to_code?: string;
+  transferred_from_code?: string;
 }
 
 export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
@@ -109,11 +117,126 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
   const [createSelectedProdToAdd, setCreateSelectedProdToAdd] = useState<string>("");
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
+  // Split / Transference Order Modal State
+  const [splitModalOrder, setSplitModalOrder] = useState<Order | null>(null);
+  const [splitSelections, setSplitSelections] = useState<{ [itemId: string]: number }>({});
+  const [splitShippingCost, setSplitShippingCost] = useState<number>(0);
+  const [splitIsAlreadyPaid, setSplitIsAlreadyPaid] = useState<boolean>(false);
+  const [splitNotes, setSplitNotes] = useState<string>("");
+  const [isSplitting, setIsSplitting] = useState(false);
+
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const showToast = (text: string, type: "success" | "error" = "success") => {
     setNotification({ type, text });
     setTimeout(() => setNotification(null), 3500);
+  };
+
+  // Navegar inmediatamente a una orden transferida o padre
+  const handleJumpToOrder = (targetCode: string) => {
+    const found = orders.find((o) => o.code === targetCode || o.id === targetCode);
+    if (found) {
+      if (editingOrder) {
+        handleOpenEdit(found);
+      } else {
+        handleOpenDetail(found);
+      }
+      showToast(`Visualizando pedido ${found.code}`);
+    } else {
+      setSearch(targetCode);
+      showToast(`Filtrando lista por ${targetCode}`);
+    }
+  };
+
+  const handleOpenSplitModal = (order: Order, preselectedItemId?: string) => {
+    setSplitModalOrder(order);
+    const initialSel: { [itemId: string]: number } = {};
+    (order.order_items || []).forEach((item) => {
+      if (!item.transferred_to_code) {
+        if (preselectedItemId && (item.id === preselectedItemId || item.product_id === preselectedItemId)) {
+          initialSel[item.id] = item.quantity;
+        }
+      }
+    });
+    setSplitSelections(initialSel);
+    setSplitShippingCost(0);
+    setSplitIsAlreadyPaid(false);
+    setSplitNotes("");
+  };
+
+  const handleConfirmSplitOrder = async () => {
+    if (!splitModalOrder) return;
+    const itemsToTransfer = Object.entries(splitSelections)
+      .filter(([_, qty]) => qty > 0)
+      .map(([itemId, quantityToTransfer]) => ({ itemId, quantityToTransfer }));
+
+    if (itemsToTransfer.length === 0) {
+      showToast("Debes seleccionar al menos un producto para transferir", "error");
+      return;
+    }
+
+    try {
+      setIsSplitting(true);
+      const res = await splitOrderAction({
+        originalOrderId: splitModalOrder.id,
+        itemsToTransfer,
+        newOrderShippingCost: Number(splitShippingCost) || 0,
+        isAlreadyPaid: splitIsAlreadyPaid,
+        newOrderNotes: splitNotes,
+      });
+
+      if (res.success && res.originalOrder && res.newOrder) {
+        showToast(`¡Listo! Se creó el pedido ${res.newOrder.code} con los productos transferidos.`);
+        const updatedOrig = res.originalOrder;
+        const createdChild = res.newOrder;
+
+        setOrders((prev) => {
+          const map = new Map<string, Order>();
+          map.set(createdChild.id, createdChild);
+          prev.forEach((o) => {
+            map.set(o.id, o.id === updatedOrig.id ? updatedOrig : o);
+          });
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+        });
+
+        if (selectedOrder && selectedOrder.id === updatedOrig.id) {
+          setSelectedOrder(updatedOrig);
+        }
+        if (editingOrder && editingOrder.id === updatedOrig.id) {
+          handleOpenEdit(updatedOrig);
+        }
+        setSplitModalOrder(null);
+      } else {
+        showToast(res.error || "Error al transferir productos", "error");
+      }
+    } catch {
+      showToast("Error inesperado al dividir el pedido", "error");
+    } finally {
+      setIsSplitting(false);
+    }
+  };
+
+  const handleRevertTransfer = async (orderId: string, itemId: string) => {
+    try {
+      const res = await revertItemTransferAction(orderId, itemId);
+      if (res.success && res.order) {
+        showToast("Transferencia cancelada. El producto vuelve a estar activo en este pedido.");
+        const updated = res.order;
+        setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+        if (selectedOrder && selectedOrder.id === updated.id) {
+          setSelectedOrder(updated);
+        }
+        if (editingOrder && editingOrder.id === updated.id) {
+          handleOpenEdit(updated);
+        }
+      } else {
+        showToast(res.error || "No se pudo deshacer la transferencia", "error");
+      }
+    } catch {
+      showToast("Error inesperado al deshacer transferencia", "error");
+    }
   };
 
   const filteredOrders = orders.filter((o) => {
@@ -196,6 +319,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
         quantity: i.quantity,
         subtotal: i.subtotal,
         image_url: i.image_url,
+        transferred_to_code: i.transferred_to_code,
+        transferred_from_code: i.transferred_from_code,
       }))
     );
     setSelectedProdToAdd("");
@@ -242,8 +367,10 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
     setSelectedProdToAdd("");
   };
 
-  // Live calculations for Edit Modal
-  const editSubtotal = editItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
+  // Live calculations for Edit Modal (solo productos activos suman al subtotal)
+  const editSubtotal = editItems
+    .filter((i) => !i.transferred_to_code)
+    .reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
   const editTotal = editSubtotal + (Number(editShippingCost) || 0);
 
   const handleSaveOrderEdit = async () => {
@@ -272,6 +399,7 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
         internal_notes: editInternalNotes.trim(),
         status: editStatus,
         shipping_cost: Number(editShippingCost) || 0,
+        parent_order_code: editingOrder.parent_order_code,
         order_items: editItems.map((item) => ({
           id: item.id,
           product_id: item.product_id,
@@ -280,6 +408,8 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
           quantity: item.quantity,
           subtotal: item.unit_price * item.quantity,
           image_url: item.image_url,
+          transferred_to_code: item.transferred_to_code,
+          transferred_from_code: item.transferred_from_code,
         })),
       });
 
@@ -639,7 +769,42 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                   <tr key={order.id} className="hover:bg-[#FFFBF7]/60 transition-colors">
                     {/* Código */}
                     <td className="py-3.5 px-4 font-extrabold text-[#6D4BB8] whitespace-nowrap">
-                      {order.code}
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="text-sm">{order.code}</span>
+                        {order.parent_order_code && (
+                          <button
+                            type="button"
+                            onClick={() => handleJumpToOrder(order.parent_order_code!)}
+                            title={`Ver pedido origen ${order.parent_order_code}`}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#FCE4EF] hover:bg-[#F472A8] text-[#C02670] hover:text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer"
+                          >
+                            <ArrowDownLeft className="w-2.5 h-2.5" />
+                            <span>De {order.parent_order_code}</span>
+                          </button>
+                        )}
+                        {(() => {
+                          const childCodes = Array.from(
+                            new Set(
+                              (order.order_items || [])
+                                .map((i) => i.transferred_to_code)
+                                .filter(Boolean) as string[]
+                            )
+                          );
+                          if (childCodes.length === 0) return null;
+                          return childCodes.map((cc) => (
+                            <button
+                              key={cc}
+                              type="button"
+                              onClick={() => handleJumpToOrder(cc)}
+                              title={`Ver pedido derivado ${cc}`}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#EEEAFB] hover:bg-[#6D4BB8] text-[#6D4BB8] hover:text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer"
+                            >
+                              <ArrowUpRight className="w-2.5 h-2.5" />
+                              <span>A {cc}</span>
+                            </button>
+                          ));
+                        })()}
+                      </div>
                     </td>
 
                     {/* Cliente */}
@@ -909,34 +1074,172 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                 </div>
               </div>
 
+              {/* Transference status banners */}
+              {selectedOrder.parent_order_code && (
+                <div className="p-3.5 bg-[#FCE4EF]/80 border border-[#F6B8D6] rounded-2xl flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <ArrowDownLeft className="w-4 h-4 text-[#C02670] shrink-0" />
+                    <span className="text-[#2E2A3B]">
+                      Entrega complementaria de <strong className="text-[#C02670]">{selectedOrder.parent_order_code}</strong>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleJumpToOrder(selectedOrder.parent_order_code!)}
+                    className="px-2.5 py-1 rounded-xl bg-white text-[#C02670] hover:bg-[#F472A8] hover:text-white font-bold text-xs border border-[#F6B8D6] transition-colors cursor-pointer shrink-0"
+                  >
+                    Ver origen
+                  </button>
+                </div>
+              )}
+
+              {(() => {
+                const childCodes = Array.from(
+                  new Set(
+                    (selectedOrder.order_items || [])
+                      .map((i) => i.transferred_to_code)
+                      .filter(Boolean) as string[]
+                  )
+                );
+                if (childCodes.length === 0) return null;
+                return (
+                  <div className="p-3.5 bg-[#EEEAFB] border border-[#D5CAFA] rounded-2xl flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpRight className="w-4 h-4 text-[#6D4BB8] shrink-0" />
+                      <span className="text-[#2E2A3B]">
+                        Tiene pendientes transferidos a:{" "}
+                        <strong className="text-[#6D4BB8]">{childCodes.join(", ")}</strong>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {childCodes.map((cc) => (
+                        <button
+                          key={cc}
+                          type="button"
+                          onClick={() => handleJumpToOrder(cc)}
+                          className="px-2.5 py-1 rounded-xl bg-white text-[#6D4BB8] hover:bg-[#6D4BB8] hover:text-white font-bold text-xs border border-[#D5CAFA] transition-colors cursor-pointer"
+                        >
+                          Ir a {cc}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Items List */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8]">
                     Productos del Pedido
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEdit(selectedOrder)}
-                    className="text-[11px] font-bold text-[#F472A8] hover:underline cursor-pointer"
-                  >
-                    Ajustar productos
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSplitModal(selectedOrder)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#6D4BB8] hover:text-[#5837A3] hover:underline cursor-pointer"
+                    >
+                      <Split className="w-3.5 h-3.5" />
+                      <span>Despacho Parcial</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(selectedOrder)}
+                      className="text-[11px] font-bold text-[#F472A8] hover:underline cursor-pointer"
+                    >
+                      Ajustar productos
+                    </button>
+                  </div>
                 </div>
                 <div className="rounded-2xl border border-[#F0E8F2] overflow-hidden divide-y divide-[#F7F2F9]">
-                  {(selectedOrder.order_items || []).map((item) => (
-                    <div key={item.id} className="p-3.5 flex items-center justify-between gap-3 text-xs">
-                      <div>
-                        <p className="font-bold text-[#2E2A3B]">{item.product_name}</p>
-                        <p className="text-[11px] text-[#7A7590]">
-                          {item.quantity} x {formatCOP(item.unit_price)}
-                        </p>
+                  {(selectedOrder.order_items || []).map((item) => {
+                    const isTransferred = Boolean(item.transferred_to_code);
+                    const isReceived = Boolean(item.transferred_from_code);
+
+                    if (isTransferred) {
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3.5 flex items-center justify-between gap-3 text-xs bg-[#FAF5FB]/80 border-l-4 border-l-[#6D4BB8]"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-[#7A7590] line-through">{item.product_name}</p>
+                              <button
+                                type="button"
+                                onClick={() => handleJumpToOrder(item.transferred_to_code!)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EEEAFB] hover:bg-[#6D4BB8] text-[#6D4BB8] hover:text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer"
+                              >
+                                <ArrowUpRight className="w-3 h-3" />
+                                <span>Transferido a {item.transferred_to_code}</span>
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-[#7A7590] line-through opacity-70">
+                              {item.quantity} x {formatCOP(item.unit_price)} • (No suma al cobro actual)
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-[#7A7590] line-through opacity-70">
+                              {formatCOP(item.subtotal)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isReceived) {
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3.5 flex items-center justify-between gap-3 text-xs bg-[#FFFBF7] border-l-4 border-l-[#F472A8]"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-[#2E2A3B]">{item.product_name}</p>
+                              <button
+                                type="button"
+                                onClick={() => handleJumpToOrder(item.transferred_from_code!)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FCE4EF] hover:bg-[#F472A8] text-[#C02670] hover:text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer"
+                              >
+                                <ArrowDownLeft className="w-3 h-3" />
+                                <span>De {item.transferred_from_code}</span>
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-[#7A7590]">
+                              {item.quantity} x {formatCOP(item.unit_price)}
+                            </p>
+                          </div>
+                          <span className="font-bold text-[#6D4BB8]">
+                            {formatCOP(item.subtotal)}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={item.id} className="p-3.5 flex items-center justify-between gap-3 text-xs hover:bg-[#FAF5FB]/50 transition-colors">
+                        <div>
+                          <p className="font-bold text-[#2E2A3B]">{item.product_name}</p>
+                          <p className="text-[11px] text-[#7A7590]">
+                            {item.quantity} x {formatCOP(item.unit_price)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-[#6D4BB8]">
+                            {formatCOP(item.subtotal)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSplitModal(selectedOrder, item.id)}
+                            title="Transferir este producto a un nuevo pedido pendiente"
+                            className="p-1.5 rounded-lg hover:bg-[#EEEAFB] text-[#6D4BB8] transition-colors cursor-pointer"
+                          >
+                            <Split className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <span className="font-bold text-[#6D4BB8]">
-                        {formatCOP(item.subtotal)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1191,9 +1494,17 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                       2. Productos Solicitados ({editItems.length})
                     </h3>
                     <p className="text-[11px] text-[#7A7590]">
-                      Ajusta la cantidad, elimina artículos descartados o agrega uno nuevo del catálogo.
+                      Ajusta la cantidad, elimina artículos descartados o transfiere productos pendientes a otro despacho.
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenSplitModal(editingOrder)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EEEAFB] hover:bg-[#6D4BB8] hover:text-white text-[#6D4BB8] text-xs font-bold transition-all shadow-2xs cursor-pointer shrink-0"
+                  >
+                    <Split className="w-3.5 h-3.5" />
+                    <span>Despacho Parcial / Transferir Pendientes</span>
+                  </button>
                 </div>
 
                 {/* Selector para agregar producto desde catálogo con buscador y orden A-Z */}
@@ -1217,68 +1528,153 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
 
                 {/* Lista de productos en edición */}
                 <div className="rounded-2xl border border-[#F0E8F2] divide-y divide-[#F7F2F9] overflow-hidden bg-white">
-                  {editItems.map((item, index) => (
-                    <div key={item.id || index} className="p-3 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {item.image_url ? (
-                          <img
-                            src={item.image_url}
-                            alt={item.product_name}
-                            className="w-10 h-10 rounded-xl object-cover border border-[#F0E8F2] shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] flex items-center justify-center text-[#6D4BB8] shrink-0">
-                            <Package className="w-5 h-5" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="font-bold text-[#2E2A3B] truncate">{item.product_name}</p>
-                          <p className="text-[11px] text-[#7A7590]">
-                            Precio unitario: {formatCOP(item.unit_price)}
-                          </p>
-                        </div>
-                      </div>
+                  {editItems.map((item, index) => {
+                    const isTransferred = Boolean(item.transferred_to_code);
+                    const isReceived = Boolean(item.transferred_from_code);
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        {/* Controles de cantidad */}
-                        <div className="flex items-center gap-1 bg-[#FAF5FB] rounded-xl border border-[#F0E8F2] p-1">
-                          <button
-                            type="button"
-                            onClick={() => handleItemQtyChange(index, -1)}
-                            disabled={item.quantity <= 1}
-                            className="w-6 h-6 rounded-lg bg-white border border-[#F0E8F2] hover:bg-gray-100 disabled:opacity-40 flex items-center justify-center text-[#2E2A3B] cursor-pointer"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="w-7 text-center font-extrabold text-[#2E2A3B] text-xs">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleItemQtyChange(index, 1)}
-                            className="w-6 h-6 rounded-lg bg-white border border-[#F0E8F2] hover:bg-gray-100 flex items-center justify-center text-[#2E2A3B] cursor-pointer"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-
-                        {/* Subtotal del ítem */}
-                        <span className="font-extrabold text-[#6D4BB8] text-xs w-24 text-right">
-                          {formatCOP(item.unit_price * item.quantity)}
-                        </span>
-
-                        {/* Botón eliminar ítem */}
-                        <button
-                          type="button"
-                          onClick={() => handleItemRemove(index)}
-                          title="Quitar producto del pedido"
-                          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer"
+                    if (isTransferred) {
+                      return (
+                        <div
+                          key={item.id || index}
+                          className="p-3 flex items-center justify-between gap-3 bg-[#FAF5FB]/80 border-l-4 border-l-[#6D4BB8]"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          <div className="flex items-center gap-3 min-w-0">
+                            {item.image_url ? (
+                              <img
+                                src={item.image_url}
+                                alt={item.product_name}
+                                className="w-10 h-10 rounded-xl object-cover border border-[#F0E8F2] opacity-40 grayscale shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
+                                <Package className="w-5 h-5" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-bold text-[#7A7590] truncate line-through">
+                                {item.product_name}
+                              </p>
+                              <p className="text-[11px] text-[#7A7590] line-through opacity-70">
+                                {item.quantity} x {formatCOP(item.unit_price)} • (Transferido, no suma a esta factura)
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleJumpToOrder(item.transferred_to_code!)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                            >
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                              <span>Ir a {item.transferred_to_code}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => item.id && handleRevertTransfer(editingOrder.id, item.id)}
+                              title="Deshacer transferencia y volver a activar este producto en este pedido"
+                              className="px-2.5 py-1.5 rounded-xl border border-[#F0E8F2] hover:bg-white text-[11px] font-bold text-[#7A7590] transition-colors cursor-pointer"
+                            >
+                              Deshacer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleItemRemove(index)}
+                              title="Quitar producto"
+                              className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={item.id || index} className="p-3 flex items-center justify-between gap-3 hover:bg-[#FAF5FB]/40 transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt={item.product_name}
+                              className="w-10 h-10 rounded-xl object-cover border border-[#F0E8F2] shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] flex items-center justify-center text-[#6D4BB8] shrink-0">
+                              <Package className="w-5 h-5" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-[#2E2A3B] truncate">{item.product_name}</p>
+                              {isReceived && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleJumpToOrder(item.transferred_from_code!)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#FCE4EF] hover:bg-[#F472A8] text-[#C02670] hover:text-white text-[10px] font-bold cursor-pointer"
+                                >
+                                  <ArrowDownLeft className="w-2.5 h-2.5" />
+                                  <span>De {item.transferred_from_code}</span>
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-[#7A7590]">
+                              Precio unitario: {formatCOP(item.unit_price)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          {/* Controles de cantidad */}
+                          <div className="flex items-center gap-1 bg-[#FAF5FB] rounded-xl border border-[#F0E8F2] p-1">
+                            <button
+                              type="button"
+                              onClick={() => handleItemQtyChange(index, -1)}
+                              disabled={item.quantity <= 1}
+                              className="w-6 h-6 rounded-lg bg-white border border-[#F0E8F2] hover:bg-gray-100 disabled:opacity-40 flex items-center justify-center text-[#2E2A3B] cursor-pointer"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="w-7 text-center font-extrabold text-[#2E2A3B] text-xs">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleItemQtyChange(index, 1)}
+                              className="w-6 h-6 rounded-lg bg-white border border-[#F0E8F2] hover:bg-gray-100 flex items-center justify-center text-[#2E2A3B] cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          {/* Subtotal del ítem */}
+                          <span className="font-extrabold text-[#6D4BB8] text-xs w-24 text-right">
+                            {formatCOP(item.unit_price * item.quantity)}
+                          </span>
+
+                          {/* Botón transferir individual */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSplitModal(editingOrder, item.id)}
+                            title="Transferir este producto a nuevo pedido pendiente"
+                            className="p-1.5 rounded-lg text-[#6D4BB8] hover:bg-[#EEEAFB] transition-colors cursor-pointer"
+                          >
+                            <Split className="w-4 h-4" />
+                          </button>
+
+                          {/* Botón eliminar ítem */}
+                          <button
+                            type="button"
+                            onClick={() => handleItemRemove(index)}
+                            title="Quitar producto del pedido"
+                            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {editItems.length === 0 && (
                     <div className="p-6 text-center text-[#7A7590]">
@@ -1341,13 +1737,20 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                 {/* Recuadro de Totales Recalculados */}
                 <div className="p-4 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] space-y-1.5 text-xs">
                   <div className="flex justify-between text-[#7A7590]">
-                    <span>Subtotal de productos ({editItems.reduce((a, b) => a + b.quantity, 0)} unidades):</span>
+                    <span>
+                      Subtotal activos ({editItems.filter((i) => !i.transferred_to_code).reduce((a, b) => a + b.quantity, 0)} unidades):
+                    </span>
                     <span className="font-bold text-[#2E2A3B]">{formatCOP(editSubtotal)}</span>
                   </div>
                   <div className="flex justify-between text-[#7A7590]">
                     <span>Costo de envío:</span>
                     <span className="font-bold text-[#2E2A3B]">{formatCOP(Number(editShippingCost) || 0)}</span>
                   </div>
+                  {editItems.some((i) => i.transferred_to_code) && (
+                    <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-800 font-medium">
+                      ℹ️ Los productos transferidos aparecen tachados y no suman al total de esta orden (se cobrarán en su orden respectiva).
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm font-extrabold pt-2 border-t border-[#F0E8F2]">
                     <span className="text-[#2E2A3B]">Total a Cobrar:</span>
                     <span className="text-[#6D4BB8] text-base">{formatCOP(editTotal)}</span>
@@ -1836,6 +2239,296 @@ export function OrdersView({ initialOrders, products = [] }: OrdersViewProps) {
                   <>
                     <Check className="w-4 h-4" />
                     <span>Crear Pedido y Generar ALY</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL: DESPACHO PARCIAL / TRANSFERIR PRODUCTOS PENDIENTES */}
+      {/* ================================================================= */}
+      {splitModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-2xs"
+            onClick={() => !isSplitting && setSplitModalOrder(null)}
+          />
+
+          <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl max-h-[92vh] flex flex-col z-10 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 border-b border-[#F0E8F2] flex items-center justify-between bg-white sticky top-0 z-20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#EEEAFB] border border-[#D5CAFA] flex items-center justify-center text-[#6D4BB8]">
+                  <Split className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-extrabold text-[#2E2A3B]">
+                    Despacho Parcial • Pedido {splitModalOrder.code}
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-[#7A7590]">
+                    Cliente: <strong>{splitModalOrder.customer_name}</strong> • Transfiere productos a una nueva orden pendiente.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={isSplitting}
+                onClick={() => setSplitModalOrder(null)}
+                className="p-2 rounded-full hover:bg-gray-100 text-[#7A7590] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <div className="p-6 space-y-5 flex-1 overflow-y-auto text-xs">
+              {/* Notice Box */}
+              <div className="p-3.5 bg-[#FAF5FB] rounded-2xl border border-[#F0E8F2] space-y-1 text-[#2E2A3B]">
+                <p className="font-bold flex items-center gap-1.5 text-[#6D4BB8]">
+                  <Package className="w-4 h-4" />
+                  <span>¿Cómo funciona el despacho parcial?</span>
+                </p>
+                <p className="text-[11px] text-[#7A7590] leading-relaxed">
+                  Los productos seleccionados se transferirán a una <strong>nueva orden pendiente</strong>. En la orden original ({splitModalOrder.code}) aparecerán tachados y <strong>no se sumarán al cobro de hoy</strong>, evitando duplicidad de productos y garantizando que el stock solo se descuente cuando los productos realmente lleguen.
+                </p>
+              </div>
+
+              {/* Items Selection */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-[#6D4BB8] uppercase tracking-wider text-[11px]">
+                    1. Selecciona los productos a transferir
+                  </h3>
+                  <span className="text-[11px] text-[#7A7590]">
+                    {Object.values(splitSelections).filter((q) => q > 0).length} seleccionados
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-[#F0E8F2] divide-y divide-[#F7F2F9] overflow-hidden bg-white">
+                  {(splitModalOrder.order_items || [])
+                    .filter((item) => !item.transferred_to_code)
+                    .map((item) => {
+                      const currentSelectedQty = splitSelections[item.id] || 0;
+                      const isSelected = currentSelectedQty > 0;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-3.5 flex items-center justify-between gap-3 transition-colors ${
+                            isSelected ? "bg-[#FAF5FB]/80 border-l-4 border-l-[#6D4BB8]" : "hover:bg-gray-50/50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                setSplitSelections((prev) => ({
+                                  ...prev,
+                                  [item.id]: e.target.checked ? item.quantity : 0,
+                                }));
+                              }}
+                              className="w-4 h-4 rounded text-[#6D4BB8] focus:ring-[#6D4BB8] cursor-pointer shrink-0"
+                            />
+
+                            {item.image_url ? (
+                              <img
+                                src={item.image_url}
+                                alt={item.product_name}
+                                className="w-10 h-10 rounded-xl object-cover border border-[#F0E8F2] shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] flex items-center justify-center text-[#6D4BB8] shrink-0">
+                                <Package className="w-5 h-5" />
+                              </div>
+                            )}
+
+                            <div className="min-w-0">
+                              <p className="font-bold text-[#2E2A3B] truncate">{item.product_name}</p>
+                              <p className="text-[11px] text-[#7A7590]">
+                                Total en pedido: {item.quantity} un. • {formatCOP(item.unit_price)} c/u
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            {isSelected && (
+                              <div className="flex items-center gap-1 bg-white rounded-xl border border-[#F0E8F2] p-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSplitSelections((prev) => ({
+                                      ...prev,
+                                      [item.id]: Math.max(1, (prev[item.id] || 1) - 1),
+                                    }));
+                                  }}
+                                  disabled={currentSelectedQty <= 1}
+                                  className="w-6 h-6 rounded-lg bg-[#FAF5FB] hover:bg-gray-200 disabled:opacity-40 flex items-center justify-center text-[#2E2A3B] cursor-pointer"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <span className="w-7 text-center font-extrabold text-[#2E2A3B] text-xs">
+                                  {currentSelectedQty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSplitSelections((prev) => ({
+                                      ...prev,
+                                      [item.id]: Math.min(item.quantity, (prev[item.id] || 1) + 1),
+                                    }));
+                                  }}
+                                  disabled={currentSelectedQty >= item.quantity}
+                                  className="w-6 h-6 rounded-lg bg-[#FAF5FB] hover:bg-gray-200 disabled:opacity-40 flex items-center justify-center text-[#2E2A3B] cursor-pointer"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+
+                            <span className="font-extrabold text-[#6D4BB8] text-xs w-24 text-right">
+                              {formatCOP(item.unit_price * (isSelected ? currentSelectedQty : item.quantity))}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                  {(splitModalOrder.order_items || []).filter((i) => !i.transferred_to_code).length === 0 && (
+                    <div className="p-6 text-center text-[#7A7590]">
+                      <p>Todos los productos de este pedido ya han sido transferidos.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* New Order Options */}
+              <div className="space-y-3 pt-3 border-t border-[#F0E8F2]">
+                <h3 className="font-extrabold text-[#6D4BB8] uppercase tracking-wider text-[11px]">
+                  2. Configuración del Nuevo Pedido Pendiente
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Costo de Envío para el nuevo despacho (COP)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={splitShippingCost}
+                      onChange={(e) => setSplitShippingCost(Number(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] font-extrabold text-[#2E2A3B] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                    <p className="text-[10px] text-[#7A7590] mt-1">
+                      (Déjalo en $0 si Alyshop asume este flete por ser un pendiente de tienda)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#7A7590] mb-1">
+                      Notas privadas para el segundo despacho
+                    </label>
+                    <input
+                      type="text"
+                      value={splitNotes}
+                      onChange={(e) => setSplitNotes(e.target.value)}
+                      placeholder="Ej: Avisar cuando llegue del proveedor..."
+                      className="w-full p-2.5 rounded-xl bg-[#FAF5FB] border border-[#F0E8F2] text-xs focus:outline-none focus:border-[#F472A8]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] cursor-pointer hover:bg-[#F3EBF5] transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={splitIsAlreadyPaid}
+                        onChange={(e) => setSplitIsAlreadyPaid(e.target.checked)}
+                        className="w-4 h-4 rounded text-[#6D4BB8] focus:ring-[#6D4BB8] cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-[#2E2A3B] block">
+                          El cliente ya pagó la totalidad por adelantado (Nequi, Daviplata o Bancolombia)
+                        </span>
+                        <span className="text-[11px] text-[#7A7590]">
+                          La nueva orden indicará que el cobro en entrega al cliente es de $0.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Resumen comparativo en tiempo real */}
+                {(() => {
+                  const transferringItems = Object.entries(splitSelections).filter(([_, q]) => q > 0);
+                  const transferringSubtotal = transferringItems.reduce((acc, [itemId, qty]) => {
+                    const item = (splitModalOrder.order_items || []).find((i) => i.id === itemId);
+                    return acc + (item ? item.unit_price * qty : 0);
+                  }, 0);
+
+                  const currentActiveSubtotal = (splitModalOrder.order_items || [])
+                    .filter((i) => !i.transferred_to_code)
+                    .reduce((acc, i) => acc + i.subtotal, 0);
+
+                  const remainingOriginalSubtotal = Math.max(0, currentActiveSubtotal - transferringSubtotal);
+
+                  return (
+                    <div className="p-4 rounded-2xl bg-[#FAF5FB] border border-[#F0E8F2] space-y-2 text-xs">
+                      <div className="flex justify-between text-[#7A7590]">
+                        <span>Quedará en {splitModalOrder.code} (para entrega hoy):</span>
+                        <strong className="text-[#2E2A3B]">{formatCOP(remainingOriginalSubtotal + splitModalOrder.shipping_cost)}</strong>
+                      </div>
+                      <div className="flex justify-between text-[#7A7590]">
+                        <span>Se transferirá al nuevo pedido pendiente:</span>
+                        <strong className="text-[#6D4BB8]">
+                          {formatCOP(transferringSubtotal + Number(splitShippingCost || 0))}
+                          {splitIsAlreadyPaid && " (Cobro al cliente: $0)"}
+                        </strong>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="p-4 border-t border-[#F0E8F2] bg-[#FAF5FB] flex items-center justify-end gap-3 sticky bottom-0 z-20">
+              <button
+                type="button"
+                disabled={isSplitting}
+                onClick={() => setSplitModalOrder(null)}
+                className="px-4 py-2.5 rounded-xl border border-[#F0E8F2] text-xs font-bold text-[#7A7590] hover:bg-white transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  isSplitting ||
+                  Object.values(splitSelections).filter((q) => q > 0).length === 0
+                }
+                onClick={handleConfirmSplitOrder}
+                className="px-6 py-2.5 rounded-xl bg-[#6D4BB8] hover:bg-[#5837A3] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSplitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creando nuevo pedido...</span>
+                  </>
+                ) : (
+                  <>
+                    <Split className="w-4 h-4" />
+                    <span>
+                      Confirmar Despacho Parcial (
+                      {Object.values(splitSelections).reduce((a, b) => a + b, 0)} unidades
+                      )
+                    </span>
                   </>
                 )}
               </button>

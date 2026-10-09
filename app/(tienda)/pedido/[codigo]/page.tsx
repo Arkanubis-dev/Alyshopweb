@@ -71,10 +71,15 @@ export default async function OrderPage({
   });
 
   const productLines = (order.order_items || [])
-    .map(
-      (item, idx) =>
-        `${idx + 1}. ${item.product_name} x${item.quantity} — ${formatCOP(item.subtotal)}`
-    )
+    .map((item, idx) => {
+      if (item.transferred_to_code) {
+        return `${idx + 1}. ~${item.product_name} x${item.quantity}~ (Transferido a pedido ${item.transferred_to_code})`;
+      }
+      if (item.transferred_from_code) {
+        return `${idx + 1}. ${item.product_name} x${item.quantity} — ${formatCOP(item.subtotal)} (Complemento de ${item.transferred_from_code})`;
+      }
+      return `${idx + 1}. ${item.product_name} x${item.quantity} — ${formatCOP(item.subtotal)}`;
+    })
     .join("\n");
 
   const invoiceUrl = `${siteUrl}/pedido/${order.code}?token=${order.public_token}`;

@@ -55,6 +55,7 @@ export async function getOrderByCodeAndToken(
               : data.status,
           internal_notes: data.internal_notes,
           created_at: data.created_at,
+          parent_order_code: data.parent_order_code || undefined,
           order_items: (data.order_items || []).map((i: any) => ({
             id: i.id,
             order_id: i.order_id,
@@ -64,6 +65,8 @@ export async function getOrderByCodeAndToken(
             quantity: i.quantity,
             subtotal: Number(i.subtotal),
             image_url: i.image_url,
+            transferred_to_code: i.transferred_to_code || undefined,
+            transferred_from_code: i.transferred_from_code || undefined,
           })),
         };
       }

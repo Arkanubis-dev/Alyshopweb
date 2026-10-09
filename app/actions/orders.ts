@@ -49,6 +49,7 @@ export async function getAllAdminOrdersAction(): Promise<Order[]> {
                 : d.status,
             internal_notes: d.internal_notes,
             created_at: d.created_at,
+            parent_order_code: d.parent_order_code || undefined,
             order_items: (d.order_items || []).map((i: any) => ({
               id: i.id,
               order_id: i.order_id,
@@ -58,6 +59,8 @@ export async function getAllAdminOrdersAction(): Promise<Order[]> {
               quantity: i.quantity,
               subtotal: Number(i.subtotal),
               image_url: i.image_url,
+              transferred_to_code: i.transferred_to_code || undefined,
+              transferred_from_code: i.transferred_from_code || undefined,
             })),
           };
           ordersMap.set(ord.code, ord);
@@ -265,9 +268,14 @@ export async function updateFullOrderAction(
           quantity: qty,
           subtotal: price * qty,
           image_url: item.image_url,
+          transferred_to_code: item.transferred_to_code,
+          transferred_from_code: item.transferred_from_code,
         };
       });
-      subtotal = newItems.reduce((acc, i) => acc + i.subtotal, 0);
+      // Subtotal solo suma productos activos (los transferidos no suman al cobro de esta orden)
+      subtotal = newItems
+        .filter((i) => !i.transferred_to_code)
+        .reduce((acc, i) => acc + i.subtotal, 0);
 
       // If connected to Supabase, update order_items table
       if (supabase && isUUID) {
@@ -282,9 +290,14 @@ export async function updateFullOrderAction(
             quantity: i.quantity,
             subtotal: i.subtotal,
             image_url: i.image_url || null,
+            transferred_to_code: i.transferred_to_code || null,
+            transferred_from_code: i.transferred_from_code || null,
           }));
           const { error: itemsError } = await supabase.from("order_items").insert(insertPayload);
-          if (itemsError) {
+          if (itemsError && itemsError.message?.includes("transferred")) {
+            const cleanPayload = insertPayload.map(({ transferred_to_code, transferred_from_code, ...rest }) => rest);
+            await supabase.from("order_items").insert(cleanPayload);
+          } else if (itemsError) {
             console.error("Error updating order_items in Supabase:", itemsError);
           }
         }
@@ -312,13 +325,20 @@ export async function updateFullOrderAction(
         total,
         status: newStatus,
         internal_notes: input.internal_notes !== undefined ? input.internal_notes : order.internal_notes,
+        parent_order_code: input.parent_order_code ?? order.parent_order_code,
         updated_at: new Date().toISOString(),
       };
 
-      const { error: orderError } = await supabase
+      let { error: orderError } = await supabase
         .from("orders")
         .update(updatePayload)
         .eq("id", order.id);
+
+      if (orderError && orderError.message?.includes("parent_order_code")) {
+        delete updatePayload.parent_order_code;
+        const resRetry = await supabase.from("orders").update(updatePayload).eq("id", order.id);
+        orderError = resRetry.error;
+      }
 
       if (
         orderError &&
@@ -354,6 +374,7 @@ export async function updateFullOrderAction(
       total,
       status: newStatus,
       internal_notes: input.internal_notes !== undefined ? input.internal_notes : order.internal_notes,
+      parent_order_code: input.parent_order_code ?? order.parent_order_code,
       order_items: newItems,
     };
 
@@ -644,6 +665,363 @@ export async function createManualOrderAction(
   } catch (err: any) {
     console.error("Error in createManualOrderAction:", err);
     return { success: false, error: err.message || "Error al crear el pedido manual" };
+  }
+}
+
+export interface TransferItemSelection {
+  itemId: string;
+  quantityToTransfer: number;
+}
+
+export interface SplitOrderInput {
+  originalOrderId: string;
+  itemsToTransfer: TransferItemSelection[];
+  newOrderShippingCost?: number;
+  newOrderNotes?: string;
+  isAlreadyPaid?: boolean;
+}
+
+/**
+ * Despacho Parcial: Transfiere productos pendientes de un pedido original a un nuevo pedido hijo.
+ * - En la orden original: los productos transferidos se marcan con transferred_to_code y no suman al subtotal.
+ * - En la nueva orden: se crea con estado "pendiente" (sin duplicar descuento de stock) y referenciando a la orden padre.
+ */
+export async function splitOrderAction(
+  input: SplitOrderInput
+): Promise<{ success: boolean; error?: string; originalOrder?: Order; newOrder?: Order }> {
+  try {
+    const orders = await getAllAdminOrdersAction();
+    const originalOrder = orders.find(
+      (o) => o.id === input.originalOrderId || o.code === input.originalOrderId
+    );
+
+    if (!originalOrder) {
+      return { success: false, error: "Pedido original no encontrado" };
+    }
+
+    if (!input.itemsToTransfer || input.itemsToTransfer.length === 0) {
+      return { success: false, error: "Debes seleccionar al menos un producto para transferir" };
+    }
+
+    const supabase = createAdminClient();
+
+    // 1. Determinar el consecutivo para la nueva orden (ej: ALY-0005)
+    let nextCode = "ALY-0001";
+    if (supabase) {
+      const { data: latest } = await supabase
+        .from("orders")
+        .select("code")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (latest && latest.length > 0 && latest[0]?.code) {
+        const match = latest[0].code.match(/ALY-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10) + 1;
+          nextCode = `ALY-${String(num).padStart(4, "0")}`;
+        }
+      }
+    } else {
+      const allOrd = Array.from(fallbackOrders.values());
+      const nums = allOrd
+        .map((o) => {
+          const m = o.code.match(/ALY-(\d+)/);
+          return m ? parseInt(m[1], 10) : 0;
+        })
+        .filter(Boolean);
+      const max = nums.length > 0 ? Math.max(...nums) : 0;
+      nextCode = `ALY-${String(max + 1).padStart(4, "0")}`;
+    }
+
+    // 2. Procesar los ítems
+    const currentItems = [...(originalOrder.order_items || [])];
+    const updatedOriginalItems: any[] = [];
+    const newOrderItems: any[] = [];
+
+    const newOrderId = `order-${Date.now()}`;
+    const publicToken = crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, "")
+      : Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+    for (const item of currentItems) {
+      const transferSel = input.itemsToTransfer.find(
+        (t) => t.itemId === item.id || (t.itemId === item.product_id && item.product_id)
+      );
+
+      if (!transferSel || transferSel.quantityToTransfer <= 0 || item.transferred_to_code) {
+        // No se transfiere o ya estaba transferido previamente
+        updatedOriginalItems.push(item);
+        continue;
+      }
+
+      const qtyToTransfer = Math.min(item.quantity, transferSel.quantityToTransfer);
+
+      if (qtyToTransfer === item.quantity) {
+        // Toda la línea se transfiere
+        updatedOriginalItems.push({
+          ...item,
+          transferred_to_code: nextCode,
+        });
+
+        newOrderItems.push({
+          id: `item-${Date.now()}-${newOrderItems.length}`,
+          order_id: newOrderId,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          unit_price: item.unit_price,
+          quantity: qtyToTransfer,
+          subtotal: item.unit_price * qtyToTransfer,
+          image_url: item.image_url,
+          transferred_from_code: originalOrder.code,
+        });
+      } else {
+        // División parcial de cantidad: una parte queda en original y otra se transfiere
+        const remainingQty = item.quantity - qtyToTransfer;
+
+        // Ítem que se queda activo en la orden original
+        updatedOriginalItems.push({
+          ...item,
+          quantity: remainingQty,
+          subtotal: item.unit_price * remainingQty,
+        });
+
+        // Ítem histórico tachado en la orden original
+        updatedOriginalItems.push({
+          id: `item-${Date.now()}-split-${updatedOriginalItems.length}`,
+          order_id: originalOrder.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          unit_price: item.unit_price,
+          quantity: qtyToTransfer,
+          subtotal: item.unit_price * qtyToTransfer,
+          image_url: item.image_url,
+          transferred_to_code: nextCode,
+        });
+
+        // Ítem en el nuevo pedido
+        newOrderItems.push({
+          id: `item-${Date.now()}-${newOrderItems.length}`,
+          order_id: newOrderId,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          unit_price: item.unit_price,
+          quantity: qtyToTransfer,
+          subtotal: item.unit_price * qtyToTransfer,
+          image_url: item.image_url,
+          transferred_from_code: originalOrder.code,
+        });
+      }
+    }
+
+    if (newOrderItems.length === 0) {
+      return { success: false, error: "No se seleccionaron productos válidos para transferir" };
+    }
+
+    // 3. Recalcular la orden original (solo suman ítems NO transferidos)
+    const originalSubtotal = updatedOriginalItems
+      .filter((i) => !i.transferred_to_code)
+      .reduce((acc, i) => acc + i.subtotal, 0);
+    const originalTotal = originalSubtotal + originalOrder.shipping_cost;
+
+    const originalNoteTag = `[Despacho parcial: Se transfirieron productos al pedido ${nextCode}]`;
+    const updatedOriginalNotes = originalOrder.internal_notes
+      ? `${originalOrder.internal_notes}\n${originalNoteTag}`
+      : originalNoteTag;
+
+    // 4. Calcular totales del nuevo pedido
+    const newSubtotal = newOrderItems.reduce((acc, i) => acc + i.subtotal, 0);
+    const newShippingCost = Math.max(0, Number(input.newOrderShippingCost) || 0);
+    const newTotal = newSubtotal + newShippingCost;
+
+    const paidInfo = input.isAlreadyPaid
+      ? " • Cobro al cliente: $0 (Ya cancelado en pedido inicial)"
+      : "";
+    const newInternalNotes = `[Despacho parcial complementario transferido desde pedido ${originalOrder.code}]${paidInfo}${
+      input.newOrderNotes ? ` • ${input.newOrderNotes}` : ""
+    }`.trim();
+
+    // 5. Estructurar orden original actualizada
+    const updatedOriginalOrder: Order = {
+      ...originalOrder,
+      subtotal: originalSubtotal,
+      total: originalTotal,
+      internal_notes: updatedOriginalNotes,
+      order_items: updatedOriginalItems,
+    };
+
+    // 6. Estructurar nueva orden creada
+    const createdNewOrder: Order = {
+      id: newOrderId,
+      code: nextCode,
+      public_token: publicToken,
+      customer_name: originalOrder.customer_name,
+      customer_phone: originalOrder.customer_phone,
+      customer_email: originalOrder.customer_email,
+      customer_id_number: originalOrder.customer_id_number,
+      city: originalOrder.city,
+      neighborhood: originalOrder.neighborhood,
+      address: originalOrder.address,
+      delivery_method: originalOrder.delivery_method,
+      notes: originalOrder.notes,
+      internal_notes: newInternalNotes,
+      status: "pendiente",
+      subtotal: newSubtotal,
+      shipping_cost: newShippingCost,
+      total: newTotal,
+      parent_order_code: originalOrder.code,
+      created_at: new Date().toISOString(),
+      order_items: newOrderItems,
+    };
+
+    // 7. Persistir en Supabase
+    if (supabase) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(originalOrder.id);
+
+      // 7.1 Actualizar orden original en Supabase
+      if (isUUID) {
+        await supabase
+          .from("orders")
+          .update({
+            subtotal: originalSubtotal,
+            total: originalTotal,
+            internal_notes: updatedOriginalNotes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", originalOrder.id);
+
+        await supabase.from("order_items").delete().eq("order_id", originalOrder.id);
+
+        const origPayload = updatedOriginalItems.map((i) => ({
+          order_id: originalOrder.id,
+          product_id: i.product_id || null,
+          product_name: i.product_name,
+          unit_price: i.unit_price,
+          quantity: i.quantity,
+          subtotal: i.subtotal,
+          image_url: i.image_url || null,
+          transferred_to_code: i.transferred_to_code || null,
+          transferred_from_code: i.transferred_from_code || null,
+        }));
+
+        const { error: errOrigItems } = await supabase.from("order_items").insert(origPayload);
+        if (errOrigItems && errOrigItems.message?.includes("transferred")) {
+          const safeOrig = origPayload.map(({ transferred_to_code, transferred_from_code, ...rest }) => rest);
+          await supabase.from("order_items").insert(safeOrig);
+        }
+      }
+
+      // 7.2 Insertar nueva orden en Supabase
+      const newOrderPayload: any = {
+        code: nextCode,
+        public_token: publicToken,
+        customer_name: originalOrder.customer_name,
+        customer_phone: originalOrder.customer_phone,
+        customer_email: originalOrder.customer_email || null,
+        customer_id_number: originalOrder.customer_id_number || null,
+        city: originalOrder.city,
+        neighborhood: originalOrder.neighborhood,
+        address: originalOrder.address,
+        delivery_method: originalOrder.delivery_method,
+        notes: originalOrder.notes || null,
+        internal_notes: newInternalNotes,
+        status: "pendiente",
+        subtotal: newSubtotal,
+        shipping_cost: newShippingCost,
+        total: newTotal,
+        parent_order_code: originalOrder.code,
+      };
+
+      let insertedId = newOrderId;
+      const { data: resNew, error: errNew } = await supabase
+        .from("orders")
+        .insert(newOrderPayload)
+        .select()
+        .single();
+
+      if (!errNew && resNew) {
+        insertedId = resNew.id;
+        createdNewOrder.id = resNew.id;
+      } else if (errNew && errNew.message?.includes("parent_order_code")) {
+        delete newOrderPayload.parent_order_code;
+        const { data: resRetry } = await supabase.from("orders").insert(newOrderPayload).select().single();
+        if (resRetry) {
+          insertedId = resRetry.id;
+          createdNewOrder.id = resRetry.id;
+        }
+      }
+
+      const newItemsPayload = newOrderItems.map((i) => ({
+        order_id: insertedId,
+        product_id: i.product_id || null,
+        product_name: i.product_name,
+        unit_price: i.unit_price,
+        quantity: i.quantity,
+        subtotal: i.subtotal,
+        image_url: i.image_url || null,
+        transferred_to_code: null,
+        transferred_from_code: originalOrder.code,
+      }));
+
+      const { error: errNewItems } = await supabase.from("order_items").insert(newItemsPayload);
+      if (errNewItems && errNewItems.message?.includes("transferred")) {
+        const safeNew = newItemsPayload.map(({ transferred_to_code, transferred_from_code, ...rest }) => rest);
+        await supabase.from("order_items").insert(safeNew);
+      }
+    }
+
+    // 8. Persistir en almacenamiento local (fallback)
+    saveFallbackOrder(updatedOriginalOrder);
+    saveFallbackOrder(createdNewOrder);
+
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin");
+    revalidatePath(`/pedido/${originalOrder.code}`);
+    revalidatePath(`/pedido/${nextCode}`);
+
+    return {
+      success: true,
+      originalOrder: updatedOriginalOrder,
+      newOrder: createdNewOrder,
+    };
+  } catch (err: any) {
+    console.error("Error in splitOrderAction:", err);
+    return { success: false, error: err.message || "Error al dividir el pedido" };
+  }
+}
+
+/**
+ * Deshace la transferencia de un producto en la orden original devolviéndolo a estado activo
+ */
+export async function revertItemTransferAction(
+  originalOrderId: string,
+  itemId: string
+): Promise<{ success: boolean; error?: string; order?: Order }> {
+  try {
+    const orders = await getAllAdminOrdersAction();
+    const order = orders.find((o) => o.id === originalOrderId || o.code === originalOrderId);
+    if (!order) return { success: false, error: "Pedido no encontrado" };
+
+    const items = (order.order_items || []).map((i) => {
+      if (i.id === itemId) {
+        return {
+          ...i,
+          transferred_to_code: undefined,
+        };
+      }
+      return i;
+    });
+
+    const activeItems = items.filter((i) => !i.transferred_to_code);
+    const subtotal = activeItems.reduce((acc, i) => acc + i.subtotal, 0);
+
+    const res = await updateFullOrderAction(order.id, {
+      order_items: items,
+      shipping_cost: order.shipping_cost,
+    });
+
+    return res;
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
 }
 
