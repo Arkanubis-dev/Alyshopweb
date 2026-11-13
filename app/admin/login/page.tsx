@@ -50,11 +50,11 @@ function LoginForm() {
             <span>Panel de Administración</span>
           </span>
         </div>
-        <h1 className="text-2xl font-extrabold text-[#2E2A3B] tracking-tight">
-          Acceso Administrativo
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2E2A3B] tracking-tight">
+          Bienvenidos Alyshop
         </h1>
         <p className="text-xs text-[#7A7590]">
-          Inicia sesión para gestionar catálogo, pedidos e inventario.
+          Acceso Administrativo · Inicia sesión para gestionar catálogo, pedidos e inventario.
         </p>
       </div>
 
