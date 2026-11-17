@@ -14,7 +14,8 @@ import {
   ChevronUp,
   ChevronDown,
   X,
-  Flame,
+  Sparkles,
+  Heart,
   Radio,
 } from "lucide-react";
 
@@ -26,49 +27,49 @@ export interface Track {
   durationStr: string;
   src: string;
   cover: string;
-  accentColor: string;
+  badge: string;
 }
 
-const PLAYLIST: Track[] = [
+const FEMININE_PLAYLIST: Track[] = [
   {
     id: 1,
-    title: "Rock Anthem & Distortion",
-    artist: "Kraken Vibes · Alyshop",
-    genre: "Rock / Metal",
-    durationStr: "3:45",
-    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80",
-    accentColor: "#e11d48",
+    title: "Dulce Café & Mañanas Tiernas",
+    artist: "Alyshop Sweet Lounge",
+    genre: "Acústica Suave & Calidez",
+    durationStr: "3:40",
+    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+    cover: "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=400&q=80",
+    badge: "🌸 Favorita",
   },
   {
     id: 2,
-    title: "Heavy Riffs & High Voltage",
-    artist: "Electric Thunder",
-    genre: "Hard Rock",
-    durationStr: "4:12",
-    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
-    cover: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80",
-    accentColor: "#f59e0b",
+    title: "Algodón de Azúcar & Sueños",
+    artist: "Pastel Dreamland",
+    genre: "Lo-Fi Cute & Melódico",
+    durationStr: "4:15",
+    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
+    cover: "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&w=400&q=80",
+    badge: "✨ Relajante",
   },
   {
     id: 3,
-    title: "Gothic Nights & Guitars",
-    artist: "Midnight Shadows",
-    genre: "Gothic Rock",
-    durationStr: "3:58",
-    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    cover: "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?auto=format&fit=crop&w=400&q=80",
-    accentColor: "#9333ea",
+    title: "Brisa Rosa & Pétalos al Viento",
+    artist: "Cozy Bedroom Beats",
+    genre: "Melodía Delicada",
+    durationStr: "3:30",
+    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+    cover: "https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=400&q=80",
+    badge: "💖 Tierna",
   },
   {
     id: 4,
-    title: "Chill Rock Acoustic Groove",
-    artist: "Acoustic Lounge",
-    genre: "Rock Suave / Chill",
-    durationStr: "3:20",
-    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    cover: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=400&q=80",
-    accentColor: "#ec4899",
+    title: "Flores de Cerezo & Piano Mágico",
+    artist: "Sakura Breeze",
+    genre: "Piano Tierno & Campanas",
+    durationStr: "3:55",
+    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3",
+    cover: "https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=400&q=80",
+    badge: "🌷 Sweet Pop",
   },
 ];
 
@@ -85,16 +86,16 @@ export function MusicPlayer() {
   const [showNotification, setShowNotification] = useState(true);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const currentTrack = PLAYLIST[currentTrackIndex];
+  const currentTrack = FEMININE_PLAYLIST[currentTrackIndex];
 
-  // Actualizar volumen
+  // Control de volumen
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
     }
   }, [volume, isMuted]);
 
-  // Cambiar canción o cargar
+  // Carga y reproducción automática al cambiar de canción una vez activado
   useEffect(() => {
     if (audioRef.current && hasStartedOnce) {
       audioRef.current.src = currentTrack.src;
@@ -134,12 +135,14 @@ export function MusicPlayer() {
 
   const handleNext = () => {
     setHasStartedOnce(true);
-    setCurrentTrackIndex((prev) => (prev + 1) % PLAYLIST.length);
+    setCurrentTrackIndex((prev) => (prev + 1) % FEMININE_PLAYLIST.length);
   };
 
   const handlePrev = () => {
     setHasStartedOnce(true);
-    setCurrentTrackIndex((prev) => (prev - 1 + PLAYLIST.length) % PLAYLIST.length);
+    setCurrentTrackIndex(
+      (prev) => (prev - 1 + FEMININE_PLAYLIST.length) % FEMININE_PLAYLIST.length
+    );
   };
 
   const handleTimeUpdate = () => {
@@ -180,67 +183,67 @@ export function MusicPlayer() {
         preload="none"
       />
 
-      {/* Contenedor flotante a la izquierda (no tapa el botón de WhatsApp a la derecha) */}
+      {/* Contenedor flotante a la izquierda (perfectamente integrado con alyshop) */}
       <div className="fixed bottom-20 left-4 md:bottom-6 md:left-6 z-40 flex flex-col items-start select-none font-sans">
         
-        {/* Banner flotante de bienvenida a la música (se oculta al dar play o descartar) */}
+        {/* Banner tierno de bienvenida (colores alyshop: morado y rosa pastel) */}
         {showNotification && !isPlaying && (
-          <div className="mb-2 bg-[#09090b]/95 backdrop-blur-md border border-[#e11d48]/50 text-white rounded-2xl p-3 shadow-2xl max-w-xs animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="mb-2 bg-white/95 backdrop-blur-md border border-[#F472A8]/40 text-[#2E2A3B] rounded-3xl p-3.5 shadow-xl shadow-purple-900/10 max-w-xs animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#e11d48] animate-ping" />
-                <span className="text-xs font-bold uppercase tracking-wider text-[#e11d48] flex items-center gap-1">
-                  <Flame className="w-3.5 h-3.5" /> Música de Tienda
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#F472A8] animate-ping" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[#6D4BB8] flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-[#F472A8]" /> Música alyshop
                 </span>
               </div>
               <button
                 onClick={() => setShowNotification(false)}
-                className="text-zinc-400 hover:text-white p-0.5 rounded-full"
-                aria-label="Cerrar notificación"
+                className="text-[#7A7590] hover:text-[#2E2A3B] p-0.5 rounded-full"
+                aria-label="Cerrar mensaje"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-[11px] text-zinc-300 mt-1 mb-2">
-              Disfruta de la mejor música ambiental y rock mientras exploras la tienda.
+            <p className="text-[11px] text-[#7A7590] mt-1.5 mb-2.5 leading-relaxed">
+              ¿Quieres música suave y tierna mientras eliges tus artículos favoritos?
             </p>
             <button
               onClick={togglePlay}
-              className="w-full py-1.5 px-3 rounded-xl bg-[#e11d48] hover:bg-[#be123c] text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+              className="w-full py-2 px-3 rounded-2xl bg-gradient-to-r from-[#6D4BB8] to-[#F472A8] hover:opacity-95 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-pink-500/20 active:scale-95 cursor-pointer"
             >
-              <Play className="w-3 h-3 fill-white" />
-              <span>Activar Música</span>
+              <Heart className="w-3.5 h-3.5 fill-white text-white" />
+              <span>Escuchar música tierna</span>
             </button>
           </div>
         )}
 
         {/* ============================================================== */}
-        {/* REPRODUCTOR EXPANDIDO (ESTILO ROCK / BRUTALIST & MODERN GLASS) */}
+        {/* MODAL / TARJETA EXPANDIDA (PALETA PASTEL MORADO & ROSA ALYSHOP) */}
         {/* ============================================================== */}
         {isExpanded && (
-          <div className="mb-3 w-80 sm:w-88 rounded-3xl bg-[#09090b]/95 backdrop-blur-xl border border-zinc-800 text-white shadow-2xl p-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="mb-3 w-80 sm:w-88 rounded-3xl bg-white/98 backdrop-blur-xl border border-[#F0E8F2] text-[#2E2A3B] shadow-2xl shadow-purple-950/15 p-5 animate-in fade-in zoom-in-95 duration-200">
             {/* Cabecera del reproductor */}
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 mb-4">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-xl bg-[#e11d48]/20 text-[#e11d48]">
-                  <Radio className="w-4 h-4" />
+            <div className="flex items-center justify-between pb-3 border-b border-[#F0E8F2] mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-2xl bg-[#FCE4EF] text-[#F472A8]">
+                  <Music className="w-4 h-4 text-[#6D4BB8]" />
                 </span>
                 <div>
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-white">
-                    Alyshop Sound Station
+                  <h4 className="text-xs font-extrabold text-[#2E2A3B] tracking-tight">
+                    alyshop Melody
                   </h4>
-                  <span className="text-[10px] text-zinc-400 block">
-                    Música en vivo para tus compras
+                  <span className="text-[10px] font-semibold text-[#F472A8] block">
+                    Melodías tiernas para tus compras 🌸
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowPlaylist((prev) => !prev)}
-                  className={`p-1.5 rounded-lg text-xs transition-colors ${
+                  className={`p-1.5 rounded-xl text-xs transition-colors cursor-pointer ${
                     showPlaylist
-                      ? "bg-[#e11d48] text-white"
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                      ? "bg-[#6D4BB8] text-white"
+                      : "text-[#7A7590] hover:text-[#2E2A3B] hover:bg-[#FAF5FB]"
                   }`}
                   title="Ver lista de canciones"
                 >
@@ -248,7 +251,7 @@ export function MusicPlayer() {
                 </button>
                 <button
                   onClick={() => setIsExpanded(false)}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                  className="p-1.5 rounded-xl text-[#7A7590] hover:text-[#2E2A3B] hover:bg-[#FAF5FB] transition-colors cursor-pointer"
                   title="Minimizar"
                 >
                   <ChevronDown className="w-4 h-4" />
@@ -256,13 +259,13 @@ export function MusicPlayer() {
               </div>
             </div>
 
-            {/* Vista de Lista de Canciones */}
+            {/* Vista de Playlist */}
             {showPlaylist ? (
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 my-3 scrollbar-thin">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
-                  Selecciona una pista:
+              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 my-2">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[#7A7590] block mb-2">
+                  Elige una canción suave:
                 </span>
-                {PLAYLIST.map((track, idx) => (
+                {FEMININE_PLAYLIST.map((track, idx) => (
                   <button
                     key={track.id}
                     onClick={() => {
@@ -270,74 +273,69 @@ export function MusicPlayer() {
                       setCurrentTrackIndex(idx);
                       setShowPlaylist(false);
                     }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-all ${
+                    className={`w-full flex items-center justify-between p-2.5 rounded-2xl text-left text-xs transition-all cursor-pointer ${
                       currentTrackIndex === idx
-                        ? "bg-[#e11d48]/20 border border-[#e11d48]/60 text-white font-bold"
-                        : "hover:bg-zinc-800/60 text-zinc-300"
+                        ? "bg-[#FCE4EF] border border-[#F472A8]/50 text-[#6D4BB8] font-bold"
+                        : "hover:bg-[#FAF5FB] text-[#2E2A3B]"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
-                      <span className="text-[11px] text-zinc-500 font-mono w-4">
+                      <span className="text-[11px] text-[#A67AE3] font-bold w-4">
                         {idx + 1}
                       </span>
                       <div className="truncate">
-                        <div className="truncate text-white">{track.title}</div>
-                        <div className="text-[10px] text-zinc-400">{track.artist}</div>
+                        <div className="truncate font-semibold">{track.title}</div>
+                        <div className="text-[10px] text-[#7A7590]">{track.genre}</div>
                       </div>
                     </div>
-                    <span className="text-[10px] text-zinc-400 font-mono ml-2">
-                      {track.durationStr}
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-[#F472A8] border border-[#F0E8F2] shrink-0 font-medium ml-2">
+                      {track.badge}
                     </span>
                   </button>
                 ))}
               </div>
             ) : (
-              /* Vista Principal del Track */
+              /* Vista Principal de la Canción */
               <div className="space-y-4">
-                {/* Portada con Vinilo Giratorio */}
+                {/* Disco Vinilo Pastel Giratorio */}
                 <div className="relative flex items-center justify-center py-2">
                   <div
-                    className={`relative w-28 h-28 rounded-full shadow-2xl flex items-center justify-center border-4 border-zinc-900 overflow-hidden ${
+                    className={`relative w-28 h-28 rounded-full shadow-lg flex items-center justify-center p-1.5 bg-gradient-to-tr from-[#6D4BB8] via-[#F472A8] to-[#FFAA90] ${
                       isPlaying ? "animate-spin" : ""
                     }`}
-                    style={{ animationDuration: "6s" }}
+                    style={{ animationDuration: "7s" }}
                   >
-                    {/* Ranuras del vinilo */}
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-800 via-zinc-950 to-black opacity-95" />
-                    <div className="absolute inset-2 rounded-full border border-zinc-700/40" />
-                    <div className="absolute inset-4 rounded-full border border-zinc-700/30" />
-                    <div className="absolute inset-6 rounded-full border border-zinc-700/20" />
-
-                    {/* Centro con la imagen */}
-                    <img
-                      src={currentTrack.cover}
-                      alt={currentTrack.title}
-                      className="relative z-10 w-12 h-12 rounded-full object-cover border-2 border-white/20"
-                    />
-
-                    {/* Agujero central */}
-                    <div className="absolute z-20 w-3 h-3 rounded-full bg-zinc-900 border border-white/30" />
+                    {/* Círculo interior del vinilo pastel */}
+                    <div className="w-full h-full rounded-full bg-[#FAF5FB] flex items-center justify-center relative overflow-hidden border border-[#F0E8F2]">
+                      <img
+                        src={currentTrack.cover}
+                        alt={currentTrack.title}
+                        className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm"
+                      />
+                      {/* Agujero central tierno */}
+                      <div className="absolute w-3.5 h-3.5 rounded-full bg-[#6D4BB8] border-2 border-white" />
+                    </div>
                   </div>
 
-                  {/* Ecualizador animado en esquina */}
-                  <div className="absolute right-4 bottom-2 flex items-end gap-1 h-6 bg-black/60 px-2 py-1 rounded-lg border border-white/10">
+                  {/* Ondas del ecualizador en rosa pastel y lila */}
+                  <div className="absolute right-3 bottom-2 flex items-end gap-1 h-6 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-xl border border-[#F0E8F2] shadow-sm">
                     <span
-                      className={`w-1 bg-[#e11d48] rounded-full transition-all duration-150 ${
+                      className={`w-1 bg-[#6D4BB8] rounded-full transition-all duration-150 ${
                         isPlaying ? "h-5 animate-pulse" : "h-1"
                       }`}
                     />
                     <span
-                      className={`w-1 bg-[#f59e0b] rounded-full transition-all duration-150 delay-75 ${
+                      className={`w-1 bg-[#F472A8] rounded-full transition-all duration-150 delay-75 ${
                         isPlaying ? "h-3 animate-pulse" : "h-1"
                       }`}
                     />
                     <span
-                      className={`w-1 bg-[#9333ea] rounded-full transition-all duration-150 delay-150 ${
+                      className={`w-1 bg-[#FFAA90] rounded-full transition-all duration-150 delay-150 ${
                         isPlaying ? "h-6 animate-pulse" : "h-1"
                       }`}
                     />
                     <span
-                      className={`w-1 bg-white rounded-full transition-all duration-150 delay-100 ${
+                      className={`w-1 bg-[#A67AE3] rounded-full transition-all duration-150 delay-100 ${
                         isPlaying ? "h-4 animate-pulse" : "h-1"
                       }`}
                     />
@@ -346,16 +344,16 @@ export function MusicPlayer() {
 
                 {/* Info de la pista */}
                 <div className="text-center">
-                  <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-zinc-800 text-zinc-300 border border-zinc-700 mb-1">
-                    {currentTrack.genre}
+                  <span className="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-[#FCE4EF] text-[#E05D8C] border border-[#FCE4EF] mb-1.5">
+                    {currentTrack.badge} · {currentTrack.genre}
                   </span>
-                  <h3 className="font-extrabold text-sm text-white truncate">
+                  <h3 className="font-extrabold text-sm text-[#2E2A3B] truncate">
                     {currentTrack.title}
                   </h3>
-                  <p className="text-xs text-zinc-400 truncate">{currentTrack.artist}</p>
+                  <p className="text-xs text-[#7A7590] truncate mt-0.5">{currentTrack.artist}</p>
                 </div>
 
-                {/* Barra de progreso */}
+                {/* Barra de progreso en rosa pastel */}
                 <div className="space-y-1">
                   <input
                     type="range"
@@ -363,19 +361,19 @@ export function MusicPlayer() {
                     max={duration || 100}
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#e11d48]"
+                    className="w-full h-1.5 bg-[#FAF5FB] rounded-lg appearance-none cursor-pointer accent-[#F472A8]"
                   />
-                  <div className="flex justify-between text-[10px] font-mono text-zinc-400">
+                  <div className="flex justify-between text-[10px] font-mono text-[#7A7590]">
                     <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                   </div>
                 </div>
 
-                {/* Controles de reproducción */}
+                {/* Controles de reproducción con estilo alyshop */}
                 <div className="flex items-center justify-center gap-4 pt-1">
                   <button
                     onClick={handlePrev}
-                    className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                    className="p-2.5 rounded-2xl text-[#7A7590] hover:text-[#6D4BB8] hover:bg-[#FAF5FB] transition-all cursor-pointer"
                     title="Anterior"
                   >
                     <SkipBack className="w-4 h-4" />
@@ -383,19 +381,19 @@ export function MusicPlayer() {
 
                   <button
                     onClick={togglePlay}
-                    className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#e11d48] to-[#f43f5e] hover:brightness-110 text-white flex items-center justify-center shadow-lg shadow-rose-900/40 transition-all active:scale-95 cursor-pointer"
+                    className="w-13 h-13 rounded-3xl bg-gradient-to-tr from-[#6D4BB8] to-[#F472A8] hover:opacity-95 text-white flex items-center justify-center shadow-lg shadow-pink-500/25 transition-all active:scale-95 cursor-pointer"
                     title={isPlaying ? "Pausar" : "Reproducir"}
                   >
                     {isPlaying ? (
-                      <Pause className="w-5 h-5 fill-white" />
+                      <Pause className="w-5 h-5 fill-white text-white" />
                     ) : (
-                      <Play className="w-5 h-5 fill-white ml-0.5" />
+                      <Play className="w-5 h-5 fill-white text-white ml-0.5" />
                     )}
                   </button>
 
                   <button
                     onClick={handleNext}
-                    className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                    className="p-2.5 rounded-2xl text-[#7A7590] hover:text-[#6D4BB8] hover:bg-[#FAF5FB] transition-all cursor-pointer"
                     title="Siguiente"
                   >
                     <SkipForward className="w-4 h-4" />
@@ -403,14 +401,14 @@ export function MusicPlayer() {
                 </div>
 
                 {/* Control de volumen */}
-                <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/80">
+                <div className="flex items-center gap-2 pt-2 border-t border-[#F0E8F2]">
                   <button
                     onClick={toggleMute}
-                    className="text-zinc-400 hover:text-white p-1"
+                    className="text-[#7A7590] hover:text-[#6D4BB8] p-1 cursor-pointer"
                     title={isMuted ? "Activar sonido" : "Silenciar"}
                   >
                     {isMuted || volume === 0 ? (
-                      <VolumeX className="w-4 h-4 text-rose-400" />
+                      <VolumeX className="w-4 h-4 text-[#F472A8]" />
                     ) : (
                       <Volume2 className="w-4 h-4" />
                     )}
@@ -425,9 +423,9 @@ export function MusicPlayer() {
                       setVolume(parseFloat(e.target.value));
                       setIsMuted(false);
                     }}
-                    className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#e11d48]"
+                    className="w-full h-1.5 bg-[#FAF5FB] rounded-lg appearance-none cursor-pointer accent-[#6D4BB8]"
                   />
-                  <span className="text-[10px] font-mono text-zinc-500 w-7 text-right">
+                  <span className="text-[10px] font-mono text-[#7A7590] w-7 text-right">
                     {Math.round((isMuted ? 0 : volume) * 100)}%
                   </span>
                 </div>
@@ -437,24 +435,24 @@ export function MusicPlayer() {
         )}
 
         {/* ============================================================== */}
-        {/* PÍLDORA / BOTÓN FLOTANTE MINIMALISTA                           */}
+        {/* PÍLDORA / BOTÓN FLOTANTE EN COLORES ALYSHOP (BLANCO, ROSA, MORADO) */}
         {/* ============================================================== */}
-        <div className="flex items-center gap-2 bg-[#09090b]/90 backdrop-blur-xl border border-zinc-800 hover:border-[#e11d48]/60 text-white rounded-full p-1.5 pr-4 shadow-xl shadow-black/40 transition-all hover:scale-102">
-          {/* Mini disco o botón play */}
+        <div className="flex items-center gap-2.5 bg-white/95 backdrop-blur-xl border border-[#F0E8F2] hover:border-[#F472A8]/60 text-[#2E2A3B] rounded-full p-1.5 pr-4 shadow-lg shadow-purple-900/10 transition-all hover:scale-102">
+          {/* Mini botón con degradado alyshop */}
           <button
             onClick={togglePlay}
             className={`relative w-10 h-10 rounded-full flex items-center justify-center shadow-md transition-all cursor-pointer ${
               isPlaying
-                ? "bg-gradient-to-tr from-[#e11d48] to-[#f43f5e] text-white"
-                : "bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+                ? "bg-gradient-to-tr from-[#6D4BB8] to-[#F472A8] text-white"
+                : "bg-[#FCE4EF] hover:bg-[#fcd2e4] text-[#6D4BB8]"
             }`}
-            title={isPlaying ? "Pausar música" : "Reproducir música"}
+            title={isPlaying ? "Pausar música" : "Reproducir música tierna"}
           >
             {isPlaying ? (
               <div className="relative flex items-center justify-center">
-                <Disc className="w-5 h-5 animate-spin" style={{ animationDuration: "3s" }} />
-                <span className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/60 rounded-full transition-opacity">
-                  <Pause className="w-3.5 h-3.5 fill-white" />
+                <Disc className="w-5 h-5 animate-spin" style={{ animationDuration: "4s" }} />
+                <span className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-[#6D4BB8]/80 rounded-full transition-opacity">
+                  <Pause className="w-3.5 h-3.5 fill-white text-white" />
                 </span>
               </div>
             ) : (
@@ -462,34 +460,35 @@ export function MusicPlayer() {
             )}
           </button>
 
-          {/* Información rápida del tema actual + ecualizador */}
+          {/* Información rápida del tema actual + ecualizador pastel */}
           <div
             onClick={() => setIsExpanded((prev) => !prev)}
-            className="cursor-pointer max-w-[120px] sm:max-w-[160px] truncate"
-            title="Clic para expandir el reproductor"
+            className="cursor-pointer max-w-[130px] sm:max-w-[170px] truncate"
+            title="Clic para ver el reproductor completo"
           >
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-white truncate">
+              <span className="text-[11px] font-bold text-[#2E2A3B] truncate">
                 {currentTrack.title}
               </span>
               {isPlaying && (
                 <div className="flex items-end gap-0.5 h-3 shrink-0">
-                  <span className="w-0.5 h-2.5 bg-[#e11d48] animate-pulse" />
-                  <span className="w-0.5 h-1.5 bg-[#f59e0b] animate-pulse delay-75" />
-                  <span className="w-0.5 h-3 bg-white animate-pulse delay-150" />
+                  <span className="w-0.5 h-2.5 bg-[#6D4BB8] animate-pulse" />
+                  <span className="w-0.5 h-1.5 bg-[#F472A8] animate-pulse delay-75" />
+                  <span className="w-0.5 h-3 bg-[#FFAA90] animate-pulse delay-150" />
                 </div>
               )}
             </div>
-            <div className="text-[9px] text-zinc-400 truncate flex items-center gap-1">
-              <span>{currentTrack.artist}</span>
+            <div className="text-[9px] font-medium text-[#F472A8] truncate flex items-center gap-1">
+              <span>{currentTrack.badge}</span>
+              <span className="text-[#7A7590]">· {currentTrack.artist}</span>
             </div>
           </div>
 
           {/* Botón de expandir */}
           <button
             onClick={() => setIsExpanded((prev) => !prev)}
-            className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors ml-1 cursor-pointer"
-            title={isExpanded ? "Minimizar" : "Expandir reproductor"}
+            className="p-1 rounded-full text-[#7A7590] hover:text-[#6D4BB8] hover:bg-[#FAF5FB] transition-colors ml-0.5 cursor-pointer"
+            title={isExpanded ? "Minimizar" : "Abrir reproductor"}
           >
             {isExpanded ? (
               <ChevronDown className="w-4 h-4" />
