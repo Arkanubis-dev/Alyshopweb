@@ -3,7 +3,6 @@ import { BottomValueStrip } from "@/components/tienda/BottomValueStrip";
 import { Footer } from "@/components/tienda/Footer";
 import { MobileBottomNav } from "@/components/tienda/MobileBottomNav";
 import { WhatsAppFloatingButton } from "@/components/tienda/WhatsAppFloatingButton";
-import { MusicPlayer } from "@/components/tienda/MusicPlayer";
 import { CategoryWatermarks } from "@/components/tienda/CategoryWatermarks";
 import { getAdminSettingsAction } from "@/app/actions/settings";
 import { getCategories } from "@/lib/supabase/queries";
@@ -41,7 +40,6 @@ export default async function TiendaLayout({
         <BottomValueStrip />
         <Footer categories={activeCategories} />
         <WhatsAppFloatingButton />
-        <MusicPlayer />
         <MobileBottomNav categories={activeCategories} />
       </div>
     </div>
